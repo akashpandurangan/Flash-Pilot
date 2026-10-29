@@ -49,6 +49,7 @@ destructive statements.
 | `…04_notifications.sql` | reminder sync triggers, `process_due_notifications()`, the e-mail delivery queue |
 | `…05_realtime_storage_cron.sql` | Realtime publication, `studio-logos` bucket policies, the 5-minute `pg_cron` job |
 | `…06_event_team.sql` | `set_event_team()` for changing a team after creation |
+| `…07_event_terminology.sql` | Re-words what the database writes (notifications, activity log, errors, stored links) to the *Events / Sessions* terms. Function replacements only - no schema change |
 
 **With the CLI (recommended)**
 
@@ -199,16 +200,16 @@ After configuring a real project, run through this once. It covers what the auto
 
 1. Open the app → **Create your studio** → confirm the e-mail → sign in → complete the onboarding wizard.
 2. Refresh in the middle of onboarding: you should resume where you left off.
-3. Add a client, then **New project** with an event ~10 hours from now, assign yourself as lead photographer,
+3. Add a client, then **New event** with a session ~10 hours from now, assign yourself as lead photographer,
    set the booking to **Confirmed**, enter an amount and an advance.
-4. Within ~5 minutes the bell shows a *New assignment* and an *Event reminder* (the event is already inside the
+4. Within ~5 minutes the bell shows a *New assignment* and an *Session reminder* (the session is already inside the
    24-hour window). `select status, remind_at from event_reminders;` should show `sent`.
-5. Reschedule the event: the old reminder becomes `superseded`, a new one is scheduled, and the team gets an
+5. Reschedule the session: the old reminder becomes `superseded`, a new one is scheduled, and the team gets an
    *updated* notice. Cancel the booking: reminders become `cancelled`.
 6. **Team → Invite to sign in** for a second person (use another address you control). Open the e-mail link,
-   set a password, and confirm they only see *Overview, Projects, Calendar, Notifications* and cannot open
+   set a password, and confirm they only see *Overview, Events, Calendar, Notifications* and cannot open
    `/payments`, `/clients` or `/team` by URL.
-7. In two browsers (owner + photographer) change the project stage and confirm the other window updates without
+7. In two browsers (owner + photographer) change the event's stage and confirm the other window updates without
    a refresh (Realtime).
 8. Record a payment bigger than the balance: you must be asked to confirm the overpayment.
 9. *Notifications → Email delivery* (owner): with Resend configured the row is *Sent*; without it, *Not sent*
@@ -244,7 +245,7 @@ links and refreshes work. Ready-made configs are included: `public/_redirects` (
 | Sign-up never sends an e-mail | Built-in mailer throttled - configure SMTP (§4) |
 | Invite e-mail link says expired / loops to login | Redirect URL not in the allow-list (§4); resend the invitation |
 | "Only the studio owner can invite people" | The signed-in user is not the owner of that studio |
-| No reminders arrive | `select * from cron.job;` - is the job there? Is the event **Confirmed**, in the future, with an active person assigned? Check `event_reminders` and `notifications`. |
+| No reminders arrive | `select * from cron.job;` - is the job there? Is the booking **Confirmed**, the session in the future, with an active person assigned? Check `event_reminders` and `notifications`. |
 | E-mails show *Not sent* | `RESEND_API_KEY` / `EMAIL_FROM` not set on the function, or the e-mail cron job (§7.2) is missing |
 | `permission denied` / empty lists for a role | Expected for roles without access; confirm the person's access level under Team |
 | Logo upload fails | Bucket/policies missing (§5), file > 2 MB, or not PNG/JPEG/WebP |

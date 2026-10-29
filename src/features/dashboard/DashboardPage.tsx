@@ -60,7 +60,7 @@ export default function DashboardPage() {
       <PageHeader
         title={`${greeting}, ${firstName}`}
         description={role === 'photographer' || role === 'editor' ? 'Here is the work assigned to you.' : `Here's what's happening at ${studio.name}.`}
-        actions={isStaff && <Button asChild><Link to="/projects/new"><FolderKanban className="size-4" /> New project</Link></Button>}
+        actions={isStaff && <Button asChild><Link to="/events/new"><FolderKanban className="size-4" /> New event</Link></Button>}
       />
 
       {kpis.isError && <div className="mb-6"><ErrorState error={kpis.error} onRetry={() => void kpis.refetch()} /></div>}
@@ -68,12 +68,12 @@ export default function DashboardPage() {
       <section aria-label="Key numbers" className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {kpis.isLoading ? Array.from({ length: canFinance ? 6 : 5 }, (_, i) => <Skeleton key={i} className="h-24" />) : k && (
           <>
-            <StatCard label="Active projects" value={k.active_projects} hint={k.inquiries > 0 ? pluralize(k.inquiries, 'inquiry', 'inquiries') : 'Confirmed & in progress'} to="/projects?booking=confirmed" icon={<FolderKanban />} />
-            <StatCard label="Upcoming events" value={k.upcoming_events} to="/calendar?view=list" icon={<CalendarDays />} />
-            <StatCard label="Today" value={k.today_events} hint={k.today_events === 1 ? 'event today' : 'events today'} to="/calendar?view=day" icon={<Zap />} />
+            <StatCard label="Active events" value={k.active_projects} hint={k.inquiries > 0 ? pluralize(k.inquiries, 'inquiry', 'inquiries') : 'Confirmed & in progress'} to="/events?booking=confirmed" icon={<FolderKanban />} />
+            <StatCard label="Upcoming sessions" value={k.upcoming_events} to="/calendar?view=list" icon={<CalendarDays />} />
+            <StatCard label="Today" value={k.today_events} hint={k.today_events === 1 ? 'session today' : 'sessions today'} to="/calendar?view=day" icon={<Zap />} />
             {canFinance && <StatCard label="Outstanding" value={formatMoney(k.outstanding_amount ?? 0, currency)} hint="Still to collect" to="/payments" icon={<IndianRupee />} />}
-            <StatCard label="In production" value={k.in_production} to="/projects?stage=production" icon={<Camera />} />
-            <StatCard label="Pending delivery" value={k.pending_delivery} hint="Editing or ready" to="/projects?stage=editing" icon={<Truck />} />
+            <StatCard label="In production" value={k.in_production} to="/events?stage=production" icon={<Camera />} />
+            <StatCard label="Pending delivery" value={k.pending_delivery} hint="Editing or ready" to="/events?stage=editing" icon={<Truck />} />
           </>
         )}
       </section>
@@ -83,17 +83,17 @@ export default function DashboardPage() {
       ) : (
         <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
           <div className="min-w-0 space-y-4">
-            <Panel title="Upcoming events" description="Next on the schedule" action={<Button variant="ghost" size="sm" asChild><Link to="/calendar">Calendar</Link></Button>} bodyClassName="p-0">
+            <Panel title="Upcoming sessions" description="Next on the schedule" action={<Button variant="ghost" size="sm" asChild><Link to="/calendar">Calendar</Link></Button>} bodyClassName="p-0">
               {schedule.isLoading ? <div className="space-y-2 p-4"><Skeleton className="h-14" /><Skeleton className="h-14" /><Skeleton className="h-14" /></div>
                 : schedule.isError ? <div className="p-4"><ErrorState error={schedule.error} onRetry={() => void schedule.refetch()} /></div>
-                : upcoming.length === 0 ? <div className="p-4"><EmptyState icon={<CalendarDays />} title="No upcoming events" description={isStaff ? 'Create a project to put events on the calendar.' : 'You have no upcoming assignments.'} /></div>
+                : upcoming.length === 0 ? <div className="p-4"><EmptyState icon={<CalendarDays />} title="No upcoming sessions" description={isStaff ? 'Create an event to put sessions on the calendar.' : 'You have no upcoming assignments.'} /></div>
                 : (
                   <ul className="divide-y divide-line">
                     {upcoming.map((e) => {
                       const photographers = (e.event_assignments ?? []).filter((a) => a.role === 'lead_photographer' || a.role === 'second_photographer')
                       return (
                         <li key={e.id}>
-                          <Link to={`/projects/${e.project_id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3 hover:bg-sidebar">
+                          <Link to={`/events/${e.project_id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3 hover:bg-sidebar">
                             <div className="w-24 shrink-0">
                               <p className="text-sm font-semibold">{relativeDayLabel(e.starts_at, tz).replace(/^\w{3}, /, '')}</p>
                               <p className="text-xs tabular-nums text-ink-muted">{fmtTime(e.starts_at, tz)}</p>
@@ -118,7 +118,7 @@ export default function DashboardPage() {
                 )}
             </Panel>
 
-            <Panel title="Production overview" description="Confirmed projects by stage">
+            <Panel title="Production overview" description="Confirmed events by stage">
               {kpis.isLoading ? <Skeleton className="h-32" /> : <StageBars counts={k?.stage_counts ?? {}} />}
             </Panel>
           </div>
@@ -157,7 +157,7 @@ function ActionRow({ item }: { item: ActionItem }) {
 
 function StageBars({ counts }: { counts: Partial<Record<(typeof PRODUCTION_STAGES)[number], number>> }) {
   const total = PRODUCTION_STAGES.reduce((s, st) => s + Number(counts[st] ?? 0), 0)
-  if (total === 0) return <p className="py-4 text-center text-sm text-ink-muted">No confirmed projects yet.</p>
+  if (total === 0) return <p className="py-4 text-center text-sm text-ink-muted">No confirmed events yet.</p>
   const max = Math.max(...PRODUCTION_STAGES.map((s) => Number(counts[s] ?? 0)))
   return (
     <ul className="space-y-3">
@@ -165,7 +165,7 @@ function StageBars({ counts }: { counts: Partial<Record<(typeof PRODUCTION_STAGE
         const n = Number(counts[s] ?? 0)
         return (
           <li key={s}>
-            <Link to={`/projects?booking=confirmed&stage=${s}`} className="group block">
+            <Link to={`/events?booking=confirmed&stage=${s}`} className="group block">
               <div className="mb-1 flex justify-between text-sm"><span className="group-hover:underline">{PRODUCTION_STAGE_LABELS[s]}</span><span className="tabular-nums font-medium">{n}</span></div>
               <div className="h-2 rounded-full bg-subtle" role="presentation"><div className="h-full rounded-full bg-ink transition-[width]" style={{ width: `${max ? (n / max) * 100 : 0}%` }} /></div>
             </Link>
@@ -178,11 +178,11 @@ function StageBars({ counts }: { counts: Partial<Record<(typeof PRODUCTION_STAGE
 
 function GettingStarted({ canManage }: { canManage: boolean }) {
   if (!canManage) {
-    return <EmptyState icon={<CalendarDays />} title="Nothing assigned yet" description="When the studio assigns you to an event or an edit it will show up here, and you'll get a reminder the day before." />
+    return <EmptyState icon={<CalendarDays />} title="Nothing assigned yet" description="When the studio assigns you to a session or an edit it will show up here, and you'll get a reminder the day before." />
   }
   const steps = [
-    { to: '/clients', icon: <Contact />, title: 'Add a client', body: 'Contact details and every project in one place.' },
-    { to: '/projects/new', icon: <Clapperboard />, title: 'Create a project', body: 'Events, venue, amount, advance - captured once.' },
+    { to: '/clients', icon: <Contact />, title: 'Add a client', body: 'Contact details and every event in one place.' },
+    { to: '/events/new', icon: <Clapperboard />, title: 'Create an event', body: 'Sessions, venue, amount, advance - captured once.' },
     { to: '/team', icon: <UsersRound />, title: 'Build your team', body: 'Photographers, videographers and editors.' },
     { to: '/equipment', icon: <Camera />, title: 'List your equipment', body: 'Reserve gear and catch double-bookings.' },
   ]

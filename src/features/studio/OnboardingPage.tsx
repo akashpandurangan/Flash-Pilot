@@ -195,7 +195,7 @@ function StudioStep({ onDone }: { onDone: () => Promise<void> }) {
         <Field label="State" error={errors.state?.message}>{(a) => <Input {...a} {...register('state')} />}</Field>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Time zone" hint="Event times are shown in this zone." error={errors.timezone?.message}>
+        <Field label="Time zone" hint="Session times are shown in this zone." error={errors.timezone?.message}>
           {(a) => (
             <Select {...a} {...register('timezone')}>
               {COMMON_TIMEZONES.map((z) => <option key={z} value={z}>{z}</option>)}
@@ -282,7 +282,7 @@ function TeamStep({ studioId, onBack, onDone }: { studioId: string; onBack: () =
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Add your team</h1>
-        <p className="mt-1 text-sm text-ink-muted">Add photographers, videographers and editors so you can assign them to events. You can skip this and do it later.</p>
+        <p className="mt-1 text-sm text-ink-muted">Add photographers, videographers and editors so you can assign them to sessions. You can skip this and do it later.</p>
       </div>
 
       {team.data && team.data.length > 0 && (
@@ -371,7 +371,7 @@ function DoneStep({ name, onFinish }: { name: string; onFinish: () => Promise<vo
       <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-ink text-white"><PartyPopper className="size-6" aria-hidden /></div>
       <h1 className="text-xl font-semibold tracking-tight">{name} is ready</h1>
       <p className="mt-2 max-w-sm text-sm leading-relaxed text-ink-muted">
-        Your workspace is set up. Add your first client and create a project - bookings, payments and production tracking all start there.
+        Your workspace is set up. Add your first client and create an event - bookings, payments and production tracking all start there.
       </p>
       {error && <Notice tone="danger" className="mt-4 w-full text-left">{error}</Notice>}
       <Button

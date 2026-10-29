@@ -25,6 +25,21 @@ UI → `features/*` → `api/*` → Supabase. Business rules that matter for cor
 transitions, who may do what, reminders) are enforced **in the database**; the TypeScript in `lib/` mirrors them
 only so the UI can preview results and hide unavailable actions.
 
+## Terminology
+
+The screens say **Event** for one booking (e.g. "Sharma–Rao Wedding") and **Session** for each dated part of it
+(Sangeet, Ceremony, Reception). The database and code keep their original internal names, so when reading SQL
+or TypeScript, translate:
+
+| In the UI | In the database / code |
+| --- | --- |
+| Event | `projects` (`project_*` columns, `Project*` types, `features/projects/`) |
+| Session | `project_events` / `event_assignments` / `event_equipment` / `event_reminders` |
+| Event type (Wedding, Birthday, …) | `event_type` - shared by events and sessions |
+
+The app lives under `/events`; old `/projects/...` links (bookmarks, stored notification links) are forwarded
+by `LegacyProjectsRedirect`.
+
 ## Data model
 
 Every business table carries `studio_id`; child tables reference parents through a composite `(id, studio_id)`
@@ -36,11 +51,11 @@ foreign key, so a row can never point at another studio's data.
 | `profiles` | One per auth user (created by trigger) |
 | `employees` | The person record. `user_id` is NULL until invited - **an employee is not an account**. Holds `access_role`, `can_view_financials`, `invite_status`, `is_active` |
 | `clients` | Contact details; archived, never deleted. Generated `phone_digits` powers duplicate warnings |
-| `projects` | Booking status and production stage are **separate columns** with milestone timestamps |
+| `projects` (UI: **events**) | Booking status and production stage are **separate columns** with milestone timestamps |
 | `project_finance` | Agreed amount, due date, notes - split from `projects` so RLS can hide money from crew |
-| `project_events` | Multiple dated events per project; times stored as `timestamptz` (UTC) |
-| `event_assignments` | People per event with a role |
-| `equipment`, `event_equipment` | Inventory (unique asset tag or quantity) and per-event reservations (inventory item or free-text) |
+| `project_events` (UI: **sessions**) | Multiple dated sessions per event; times stored as `timestamptz` (UTC) |
+| `event_assignments` | People per session with a role |
+| `equipment`, `event_equipment` | Inventory (unique asset tag or quantity) and per-session reservations (inventory item or free-text) |
 | `payments` | Immutable payment records; voided, never deleted; recorded-by snapshot |
 | `production_tasks`, `project_deliveries` | Checklist and delivery details |
 | `activity_logs` | Who did what and when; `financial` entries are hidden from non-finance roles |
@@ -52,7 +67,7 @@ foreign key, so a row can never point at another studio's data.
 - `studio_members` is merged into `employees` - every account holder is also an employee, and
   "record vs. account" is the nullable `user_id`. This keeps one source of truth.
 - `project_assignments` → `event_assignments` and `project_equipment` → `event_equipment`, because the brief
-  requires team and equipment *per event* (an engagement and a wedding need different people and gear).
+  requires team and equipment *per session* (an engagement and a wedding need different people and gear).
 - Added `project_finance` (column-level secrecy via RLS), and the delivery/reminder tables.
 
 ### Money
@@ -78,9 +93,9 @@ Instants are stored in UTC. All entry and display uses the *studio's* zone (`dat
 | --- | :-: | :-: | :-: | :-: |
 | Studio settings, invite people, set access & financial flag | ✔ | | | |
 | Team / equipment management | ✔ | ✔ | | |
-| Clients, create/edit projects, confirm/cancel bookings | ✔ | ✔ | | |
+| Clients, create/edit events, confirm/cancel bookings | ✔ | ✔ | | |
 | Money: amounts, payments, financial reports | ✔ | only with flag | | |
-| See projects | all | all | assigned only | assigned (event or editor) only |
+| See events | all | all | assigned only | assigned (session or editor) only |
 | Client contact | full | full | name + phone | name only |
 | Start production / mark shoot done | ✔ | ✔ | ✔ (assigned) | |
 | Move to editing | ✔ | ✔ | | |
@@ -91,7 +106,7 @@ Instants are stored in UTC. All entry and display uses the *studio's* zone (`dat
 Enforcement lives in `02_security.sql` (RLS policies, `employees_guard`, helper functions) and the RPCs, which
 re-check the caller. `src/lib/permissions.ts` mirrors the matrix for the UI and is unit-tested; `tests/db` proves
 the database side (e.g. a photographer cannot read `payments`, `project_finance`, `clients`, or another
-photographer's project).
+photographer's event).
 
 ## Workflow
 
@@ -110,7 +125,7 @@ allowed after an explicit confirmation. Ticking checklist items **never** change
               │  (triggers keep this in sync)
               ▼
         event_reminders  ── scheduled | superseded | cancelled | sent | skipped | failed
-              │   unique (event, person, event start)  → a new start time = a new reminder
+              │   unique (session, person, session start)  → a new start time = a new reminder
               ▼
  pg_cron every 5 min → process_due_notifications()        (idempotent: unique dedupe_key)
               │   re-validates each reminder at send time (still confirmed? still assigned? same start?)
@@ -124,7 +139,7 @@ allowed after an explicit confirmation. Ticking checklist items **never** change
 ```
 
 Preferences (`notification_preferences`) are honoured when a notification is created. Reminders default to 24 h
-before the reporting time (configurable 12–72 h); an event already inside the window is reminded immediately.
+before the reporting time (configurable 12–72 h); a session already inside the window is reminded immediately.
 
 ## Realtime
 

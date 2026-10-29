@@ -80,7 +80,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Overview', icon: 'overview', permission: 'overview.view', end: true },
-  { to: '/projects', label: 'Projects', icon: 'projects', permission: 'projects.view' },
+  { to: '/events', label: 'Events', icon: 'projects', permission: 'projects.view' },
   { to: '/calendar', label: 'Calendar', icon: 'calendar', permission: 'calendar.view' },
   { to: '/clients', label: 'Clients', icon: 'clients', permission: 'clients.view' },
   { to: '/team', label: 'Team', icon: 'team', permission: 'team.view' },

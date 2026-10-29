@@ -29,9 +29,9 @@ export const equipmentRowSchema = z
 export const eventSchema = z
   .object({
     dbId: z.string().optional(),
-    title: z.string().trim().min(1, 'Name this event').max(160),
+    title: z.string().trim().min(1, 'Name this session').max(160),
     event_type: z.enum(EVENT_TYPES),
-    date: z.string().min(1, 'Choose the event date'),
+    date: z.string().min(1, 'Choose the session date'),
     start_time: z.string().min(1, 'Set the reporting time'),
     end_time: z.string().min(1, 'Set the end time'),
     venue_name: z.string().trim().max(160),
@@ -48,7 +48,7 @@ export const eventSchema = z
     const seen = new Set<string>()
     ev.assignments.forEach((a, i) => {
       if (!a.employee_id) return
-      if (seen.has(a.employee_id)) ctx.addIssue({ code: 'custom', path: ['assignments', i, 'employee_id'], message: 'Already assigned to this event' })
+      if (seen.has(a.employee_id)) ctx.addIssue({ code: 'custom', path: ['assignments', i, 'employee_id'], message: 'Already assigned to this session' })
       seen.add(a.employee_id)
     })
     const items = new Set<string>()
@@ -62,7 +62,7 @@ export const eventSchema = z
 export const projectSchema = z
   .object({
     client_id: z.string().min(1, 'Choose a client'),
-    name: z.string().trim().min(2, 'Give the project a name').max(160),
+    name: z.string().trim().min(2, 'Give the event a name').max(160),
     event_type: z.enum(EVENT_TYPES),
     booking_status: z.enum(['inquiry', 'confirmed']),
     description: z.string().trim().max(4000),
@@ -78,13 +78,13 @@ export const projectSchema = z
     advance_method: z.enum(['cash', 'upi', 'bank_transfer', 'other']),
     advance_reference: z.string().trim().max(120),
     allow_overpayment: z.boolean(),
-    events: z.array(eventSchema).min(1, 'Add at least one event'),
+    events: z.array(eventSchema).min(1, 'Add at least one session'),
   })
   .superRefine((v, ctx) => {
     const agreed = parseMoneyInput(v.agreed_amount) ?? 0
     const advance = parseMoneyInput(v.advance_amount) ?? 0
     if (advance > 0 && advance > agreed && !v.allow_overpayment) {
-      ctx.addIssue({ code: 'custom', path: ['advance_amount'], message: agreed === 0 ? 'Enter the project amount first, or confirm below' : 'The advance is more than the project amount - confirm below to record it as credit' })
+      ctx.addIssue({ code: 'custom', path: ['advance_amount'], message: agreed === 0 ? 'Enter the event amount first, or confirm below' : 'The advance is more than the event amount - confirm below to record it as credit' })
     }
     if (v.editing_due_date && v.delivery_due_date && v.delivery_due_date < v.editing_due_date) {
       ctx.addIssue({ code: 'custom', path: ['delivery_due_date'], message: 'Delivery should not be before editing is due' })

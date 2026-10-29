@@ -70,7 +70,7 @@ export default function CalendarPage() {
 
   return (
     <>
-      <PageHeader title="Calendar" description="Every confirmed and tentative event, in your studio's time zone." />
+      <PageHeader title="Calendar" description="Every confirmed and tentative session, in your studio's time zone." />
 
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
@@ -124,7 +124,7 @@ function Warnings({ conflicts }: { conflicts: ReturnType<typeof findAllConflicts
         {counts.team > 0 && <span>{counts.team} double-booked</span>}
         {counts.gear > 0 && <span>{counts.gear} equipment {counts.gear === 1 ? 'issue' : 'issues'}</span>}
         {counts.unstaffed > 0 && <span>{counts.unstaffed} without a photographer</span>}
-        {counts.overlap > 0 && <span>{counts.overlap} overlapping {counts.overlap === 1 ? 'event' : 'events'}</span>}
+        {counts.overlap > 0 && <span>{counts.overlap} overlapping {counts.overlap === 1 ? 'session' : 'sessions'}</span>}
       </p>
       <ul className="mt-1.5 list-disc space-y-0.5 pl-4">{shown.map((c, i) => <li key={i}>{describeConflict(c)}</li>)}</ul>
     </Notice>
@@ -175,7 +175,7 @@ function MonthView({ grid, anchor, events, tz, today, warned, onDay }: { grid: s
                 <ul className="space-y-1">
                   {list.slice(0, 3).map((e) => (
                     <li key={e.id}>
-                      <Link to={`/projects/${e.project_id}`} title={eventLabel(e, tz)} aria-label={eventLabel(e, tz)} className={cn('flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-[11px] leading-4', chipStyle(e))}>
+                      <Link to={`/events/${e.project_id}`} title={eventLabel(e, tz)} aria-label={eventLabel(e, tz)} className={cn('flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-[11px] leading-4', chipStyle(e))}>
                         {warned.has(e.id) && <AlertTriangle className="size-3 shrink-0" aria-hidden />}
                         <span className="truncate"><span className="tabular-nums opacity-80">{fmtTime(e.starts_at, tz).replace(':00', '')}</span> {e.project.name}</span>
                       </Link>
@@ -232,7 +232,7 @@ function TimeGrid({ days, events, tz, today, warned, onDay }: { days: string[]; 
             </button>
           ))}
         </div>
-        {allDayEmpty && <p className="border-b border-line px-4 py-2 text-center text-xs text-ink-muted">No events {days.length === 1 ? 'on this day' : 'this week'}.</p>}
+        {allDayEmpty && <p className="border-b border-line px-4 py-2 text-center text-xs text-ink-muted">No sessions {days.length === 1 ? 'on this day' : 'this week'}.</p>}
         <div ref={scroller} className="max-h-[68dvh] overflow-y-auto">
           <div className="relative grid" style={{ gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))`, height: 24 * HOUR }}>
             <div aria-hidden>
@@ -245,7 +245,7 @@ function TimeGrid({ days, events, tz, today, warned, onDay }: { days: string[]; 
                 {items.map(({ e, start, end, lane, lanes }) => (
                   <Link
                     key={`${e.id}-${d}`}
-                    to={`/projects/${e.project_id}`}
+                    to={`/events/${e.project_id}`}
                     title={eventLabel(e, tz)}
                     aria-label={eventLabel(e, tz)}
                     className={cn('absolute overflow-hidden rounded-md border-l-2 px-1.5 py-1 text-[11px] leading-tight shadow-sm', chipStyle(e), 'border-l-ink')}
@@ -276,7 +276,7 @@ function Agenda({ events, tz, warned }: { events: ScheduleEvent[]; tz: string; w
     return [...m.entries()]
   }, [events, tz])
 
-  if (groups.length === 0) return <EmptyState icon={<CalendarDays />} title="Nothing coming up" description="No events in the next 60 days match these filters." />
+  if (groups.length === 0) return <EmptyState icon={<CalendarDays />} title="Nothing coming up" description="No sessions in the next 60 days match these filters." />
   return (
     <div className="space-y-5">
       {groups.map(([day, list]) => (
@@ -285,7 +285,7 @@ function Agenda({ events, tz, warned }: { events: ScheduleEvent[]; tz: string; w
           <ul className="divide-y divide-line rounded-lg border border-line">
             {list.map((e) => (
               <li key={e.id}>
-                <Link to={`/projects/${e.project_id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-sidebar">
+                <Link to={`/events/${e.project_id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-sidebar">
                   <span className="w-28 shrink-0 text-sm tabular-nums">{fmtTimeRange(e.starts_at, e.ends_at, tz)}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{e.project.name} <span className="font-normal text-ink-muted">· {e.title}</span></span>

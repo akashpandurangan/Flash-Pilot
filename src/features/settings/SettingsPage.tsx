@@ -124,17 +124,17 @@ export default function SettingsPage() {
           <Panel title="Region & reminders">
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Time zone" hint="Event times are entered and shown in this zone.">
+                <Field label="Time zone" hint="Session times are entered and shown in this zone.">
                   {(a) => <Select {...a} {...register('timezone')}>{[...new Set([studio.timezone, ...COMMON_TIMEZONES])].map((z) => <option key={z} value={z}>{z}</option>)}</Select>}
                 </Field>
                 <Field label="Currency">{(a) => <Select {...a} {...register('currency')}>{[...new Set([studio.currency, ...COMMON_CURRENCIES])].map((c) => <option key={c} value={c}>{c}</option>)}</Select>}</Field>
               </div>
-              {tzChanged && <Notice tone="warning">Existing events keep their exact moment in time, but will now display in the new zone. Check upcoming events after saving.</Notice>}
+              {tzChanged && <Notice tone="warning">Existing sessions keep their exact moment in time, but will now display in the new zone. Check upcoming sessions after saving.</Notice>}
               {currencyChanged && <Notice tone="warning">Changing currency does not convert existing amounts - they are only relabelled.</Notice>}
-              <Field label="Send event reminders" hint="How long before the reporting time assigned team members are reminded. Only confirmed events send reminders.">
+              <Field label="Send session reminders" hint="How long before the reporting time assigned team members are reminded. Only sessions of confirmed events send reminders.">
                 {(a) => <Select {...a} {...register('reminder_lead_hours')}>{[[12, '12 hours before'], [24, '1 day before (24 hours)'], [48, '2 days before (48 hours)'], [72, '3 days before (72 hours)']].map(([h, l]) => <option key={h} value={String(h)}>{l}</option>)}</Select>}
               </Field>
-              <p className="text-xs text-ink-muted">Changing this affects reminders scheduled from now on; reminders already scheduled keep their time until the event changes.</p>
+              <p className="text-xs text-ink-muted">Changing this affects reminders scheduled from now on; reminders already scheduled keep their time until the session changes.</p>
             </div>
           </Panel>
           <div className="flex justify-end"><Button type="submit" loading={isSubmitting} disabled={!isDirty}>Save settings</Button></div>
@@ -158,7 +158,7 @@ function ChecklistEditor() {
   const move = (i: number, d: -1 | 1) => setItems((xs) => { const next = [...xs]; const j = i + d; if (j < 0 || j >= next.length) return xs; [next[i], next[j]] = [next[j]!, next[i]!]; return next })
 
   return (
-    <Panel title="Default production checklist" description="Copied onto every new project. Existing projects are not changed - edit those from their Production tab.">
+    <Panel title="Default production checklist" description="Copied onto every new event. Existing events are not changed - edit those from their Production tab.">
       <ol className="space-y-2">
         {items.map((it, i) => (
           <li key={i} className="grid grid-cols-[1fr_auto] items-center gap-2 sm:grid-cols-[1fr_160px_auto]">

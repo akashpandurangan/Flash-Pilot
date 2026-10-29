@@ -60,7 +60,7 @@ export default function PaymentsPage() {
 
   const exportHistory = () => {
     downloadCsv(`payments_${f.from}_to_${f.to}.csv`, toCsv(history.data ?? [], [
-      { header: 'Date', value: (p) => p.paid_on }, { header: 'Project ID', value: (p) => p.project?.project_code }, { header: 'Project', value: (p) => p.project?.name },
+      { header: 'Date', value: (p) => p.paid_on }, { header: 'Event ID', value: (p) => p.project?.project_code }, { header: 'Event', value: (p) => p.project?.name },
       { header: 'Amount', value: (p) => Number(p.amount) }, { header: 'Method', value: (p) => PAYMENT_METHOD_LABELS[p.method] }, { header: 'Reference', value: (p) => p.reference },
       { header: 'Recorded by', value: (p) => p.recorded_by_name }, { header: 'Status', value: (p) => p.status },
     ]))
@@ -70,7 +70,7 @@ export default function PaymentsPage() {
     <>
       <PageHeader title="Payments" description="What's been agreed, what's been received and what's still to collect. Payments are recorded here; the money moves outside the app." />
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Agreed (confirmed projects)" value={formatMoney(totals.agreed, currency)} />
+        <StatCard label="Agreed (confirmed events)" value={formatMoney(totals.agreed, currency)} />
         <StatCard label="Received" value={formatMoney(totals.paid, currency)} />
         <StatCard label="Outstanding" value={formatMoney(totals.outstanding, currency)} />
         <StatCard label="Overdue" value={totals.overdue} hint={totals.overdue > 0 ? 'Past their due date' : 'Nothing overdue'} />
@@ -78,13 +78,13 @@ export default function PaymentsPage() {
 
       <Tabs value={f.tab} onValueChange={(tab) => setF({ tab })}>
         <TabsList>
-          <TabsTrigger value="balances">Project balances</TabsTrigger>
+          <TabsTrigger value="balances">Event balances</TabsTrigger>
           <TabsTrigger value="history">Payment history</TabsTrigger>
         </TabsList>
 
         <TabsContent value="balances">
           <FilterBar>
-            <SearchInput className="sm:w-72" value={f.q} onChange={(q) => setF({ q })} placeholder="Search project or client" label="Search balances" />
+            <SearchInput className="sm:w-72" value={f.q} onChange={(q) => setF({ q })} placeholder="Search event or client" label="Search balances" />
             <Select aria-label="Show" className="sm:w-44" value={f.state} onChange={(e) => setF({ state: e.target.value })}>
               <option value="outstanding">Outstanding</option><option value="overdue">Overdue</option><option value="paid">Fully paid</option><option value="all">All</option>
             </Select>
@@ -93,15 +93,15 @@ export default function PaymentsPage() {
             query={financials.isError ? financials : projects}
             isEmpty={rows.length === 0}
             skeleton={<ListSkeleton />}
-            empty={<EmptyState icon={<IndianRupee />} title={f.state === 'outstanding' ? 'Nothing outstanding' : 'No projects here'} description={f.state === 'outstanding' ? 'Every project is paid up.' : 'Try another filter.'} />}
+            empty={<EmptyState icon={<IndianRupee />} title={f.state === 'outstanding' ? 'Nothing outstanding' : 'No events here'} description={f.state === 'outstanding' ? 'Every event is paid up.' : 'Try another filter.'} />}
           >
             <div className="hidden md:block">
               <TableWrap>
-                <THead><tr><TH>Project</TH><TH>Client</TH><TH className="text-right">Agreed</TH><TH className="text-right">Received</TH><TH className="text-right">Balance</TH><TH>Due</TH><TH>Status</TH>{canManage && <TH className="w-32"><span className="sr-only">Actions</span></TH>}</tr></THead>
+                <THead><tr><TH>Event</TH><TH>Client</TH><TH className="text-right">Agreed</TH><TH className="text-right">Received</TH><TH className="text-right">Balance</TH><TH>Due</TH><TH>Status</TH>{canManage && <TH className="w-32"><span className="sr-only">Actions</span></TH>}</tr></THead>
                 <tbody>
                   {rows.map(({ p, fin, s, overdue }) => (
                     <TR key={p.id}>
-                      <TD><Link to={`/projects/${p.id}?tab=payments`} className="font-medium hover:underline">{p.name}</Link><span className="block text-xs text-ink-muted">{p.project_code}</span></TD>
+                      <TD><Link to={`/events/${p.id}?tab=payments`} className="font-medium hover:underline">{p.name}</Link><span className="block text-xs text-ink-muted">{p.project_code}</span></TD>
                       <TD>{p.client_name}</TD>
                       <TD className="text-right tabular-nums">{formatMoney(s.agreed, currency)}</TD>
                       <TD className="text-right tabular-nums">{formatMoney(s.paid, currency)}</TD>
@@ -117,7 +117,7 @@ export default function PaymentsPage() {
             <ul className="space-y-2 md:hidden">
               {rows.map(({ p, fin, s, overdue }) => (
                 <li key={p.id} className="rounded-lg border border-line p-3">
-                  <Link to={`/projects/${p.id}?tab=payments`} className="block"><p className="truncate text-sm font-medium">{p.name}</p><p className="truncate text-xs text-ink-muted">{p.client_name}</p></Link>
+                  <Link to={`/events/${p.id}?tab=payments`} className="block"><p className="truncate text-sm font-medium">{p.name}</p><p className="truncate text-xs text-ink-muted">{p.client_name}</p></Link>
                   <div className="mt-2 flex items-end justify-between">
                     <div><p className="text-lg font-semibold tabular-nums">{s.credit > 0 ? `Credit ${formatMoney(s.credit, currency)}` : formatMoney(s.balance, currency)}</p><p className="text-xs text-ink-muted">of {formatMoney(s.agreed, currency)}{fin.payment_due_date && ` · due ${fmtDateOnly(fin.payment_due_date)}`}</p></div>
                     <div className="flex flex-col items-end gap-1.5"><PaymentStateBadge state={s.state} />{overdue && <Badge tone="danger">Overdue</Badge>}</div>
@@ -138,12 +138,12 @@ export default function PaymentsPage() {
           <DataState query={history} isEmpty={(history.data ?? []).length === 0} skeleton={<ListSkeleton />} empty={<EmptyState icon={<IndianRupee />} title="No payments in this period" description="Change the dates to look further back." />}>
             <p className="mb-3 text-sm text-ink-muted">Received in this period: <span className="font-semibold text-ink tabular-nums">{formatMoney(received, currency)}</span> across {(history.data ?? []).filter((p) => p.status === 'valid').length} payment(s)</p>
             <TableWrap>
-              <THead><tr><TH>Date</TH><TH>Project</TH><TH className="text-right">Amount</TH><TH>Method</TH><TH>Reference</TH><TH>Recorded by</TH><TH>Status</TH></tr></THead>
+              <THead><tr><TH>Date</TH><TH>Event</TH><TH className="text-right">Amount</TH><TH>Method</TH><TH>Reference</TH><TH>Recorded by</TH><TH>Status</TH></tr></THead>
               <tbody>
                 {(history.data ?? []).map((p) => (
                   <TR key={p.id} className={p.status === 'void' ? 'text-ink-muted' : ''}>
                     <TD className="whitespace-nowrap">{fmtDateOnly(p.paid_on)}</TD>
-                    <TD>{p.project ? <Link to={`/projects/${p.project.id}?tab=payments`} className="hover:underline">{p.project.name}</Link> : '—'}</TD>
+                    <TD>{p.project ? <Link to={`/events/${p.project.id}?tab=payments`} className="hover:underline">{p.project.name}</Link> : '—'}</TD>
                     <TD className={`text-right tabular-nums ${p.status === 'void' ? 'line-through' : 'font-medium'}`}>{formatMoney(Number(p.amount), currency)}</TD>
                     <TD>{PAYMENT_METHOD_LABELS[p.method]}</TD>
                     <TD className="max-w-40 truncate">{p.reference ?? '—'}</TD>

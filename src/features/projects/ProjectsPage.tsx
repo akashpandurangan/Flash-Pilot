@@ -57,7 +57,7 @@ export default function ProjectsPage() {
 
   const archive = useMutation({
     mutationFn: ({ id, archived }: { id: string; archived: boolean }) => setProjectArchived(id, archived),
-    onSuccess: (_d, v) => { toast.success(v.archived ? 'Project archived' : 'Project restored'); invalidate() },
+    onSuccess: (_d, v) => { toast.success(v.archived ? 'Event archived' : 'Event restored'); invalidate() },
     onError: (e) => toast.error(errorMessage(e)),
   })
 
@@ -69,8 +69,8 @@ export default function ProjectsPage() {
     <RowMenu
       p={p}
       canManage={canManage}
-      onOpen={() => navigate(`/projects/${p.id}`)}
-      onEdit={() => navigate(`/projects/${p.id}/edit`)}
+      onOpen={() => navigate(`/events/${p.id}`)}
+      onEdit={() => navigate(`/events/${p.id}/edit`)}
       onCancel={() => setCancelling(p)}
       onArchive={() => archive.mutate({ id: p.id, archived: !p.archived_at })}
     />
@@ -79,13 +79,13 @@ export default function ProjectsPage() {
   return (
     <>
       <PageHeader
-        title="Projects"
-        description={canManage ? 'Every booking from inquiry to delivery.' : 'The events and edits assigned to you.'}
-        actions={canManage && <Button asChild><Link to="/projects/new"><Plus className="size-4" /> New project</Link></Button>}
+        title="Events"
+        description={canManage ? 'Every booking from inquiry to delivery.' : 'The sessions and edits assigned to you.'}
+        actions={canManage && <Button asChild><Link to="/events/new"><Plus className="size-4" /> New event</Link></Button>}
       />
 
       <FilterBar>
-        <SearchInput className="sm:w-72" value={f.q} onChange={(q) => setF({ q })} placeholder="Search project, client or ID" label="Search projects" />
+        <SearchInput className="sm:w-72" value={f.q} onChange={(q) => setF({ q })} placeholder="Search event, client or ID" label="Search events" />
         <Select aria-label="Booking status" className="sm:w-40" value={f.booking} onChange={(e) => setF({ booking: e.target.value })}>
           <option value="">All bookings</option>
           {options(BOOKING_STATUS_LABELS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -95,7 +95,7 @@ export default function ProjectsPage() {
           {PRODUCTION_STAGES.map((s) => <option key={s} value={s}>{PRODUCTION_STAGE_LABELS[s]}</option>)}
         </Select>
         <Select aria-label="Sort by" className="sm:w-48" value={f.sort} onChange={(e) => setF({ sort: e.target.value })}>
-          <option value="soonest">Next event first</option><option value="latest">Latest event date</option><option value="newest">Recently created</option><option value="name">Name (A–Z)</option>
+          <option value="soonest">Next session first</option><option value="latest">Latest session date</option><option value="newest">Recently created</option><option value="name">Name (A–Z)</option>
         </Select>
         <Button variant="secondary" onClick={() => setShowFilters((s) => !s)} aria-expanded={showFilters}><SlidersHorizontal className="size-4" /> Filters</Button>
         <div className="sm:ml-auto">
@@ -113,10 +113,10 @@ export default function ProjectsPage() {
               <Select value={f.emp} onChange={(e) => setF({ emp: e.target.value })}><option value="">Anyone</option>{(team.data ?? []).map((e) => <option key={e.id} value={e.id}>{e.full_name}</option>)}</Select>
             </label>
           )}
-          <label className="space-y-1 text-[13px] font-medium">Events from<Input type="date" value={f.from} onChange={(e) => setF({ from: e.target.value })} /></label>
-          <label className="space-y-1 text-[13px] font-medium">Events to<Input type="date" value={f.to} min={f.from} onChange={(e) => setF({ to: e.target.value })} /></label>
+          <label className="space-y-1 text-[13px] font-medium">Sessions from<Input type="date" value={f.from} onChange={(e) => setF({ from: e.target.value })} /></label>
+          <label className="space-y-1 text-[13px] font-medium">Sessions to<Input type="date" value={f.to} min={f.from} onChange={(e) => setF({ to: e.target.value })} /></label>
           <label className="space-y-1 text-[13px] font-medium">Show
-            <Select value={f.archived} onChange={(e) => setF({ archived: e.target.value })}><option value="0">Active projects</option><option value="1">Archived</option></Select>
+            <Select value={f.archived} onChange={(e) => setF({ archived: e.target.value })}><option value="0">Active events</option><option value="1">Archived</option></Select>
           </label>
         </Card>
       )}
@@ -127,11 +127,11 @@ export default function ProjectsPage() {
         skeleton={<ListSkeleton />}
         empty={
           filtered ? (
-            <EmptyState icon={<FolderKanban />} title="No projects match" description="Try removing a filter or changing your search." action={<Button variant="secondary" onClick={clear}>Clear filters</Button>} />
+            <EmptyState icon={<FolderKanban />} title="No events match" description="Try removing a filter or changing your search." action={<Button variant="secondary" onClick={clear}>Clear filters</Button>} />
           ) : canManage ? (
-            <EmptyState icon={<FolderKanban />} title="Create your first project" description="A project holds the client, event dates, team, equipment and payments for one booking." action={<Button asChild><Link to="/projects/new"><Plus className="size-4" /> New project</Link></Button>} />
+            <EmptyState icon={<FolderKanban />} title="Create your first event" description="An event holds the client, session dates, team, equipment and payments for one booking." action={<Button asChild><Link to="/events/new"><Plus className="size-4" /> New event</Link></Button>} />
           ) : (
-            <EmptyState icon={<FolderKanban />} title="Nothing assigned to you yet" description="When the studio assigns you to an event or an edit, it appears here." />
+            <EmptyState icon={<FolderKanban />} title="Nothing assigned to you yet" description="When the studio assigns you to a session or an edit, it appears here." />
           )
         }
       >
@@ -140,12 +140,12 @@ export default function ProjectsPage() {
             <div className="hidden md:block">
               <TableWrap>
                 <THead>
-                  <tr><TH>Project</TH><TH>Client</TH><TH>Date</TH><TH>Type</TH><TH>Booking</TH><TH>Stage</TH><TH>Team</TH>{canFinance && <TH className="text-right">Balance</TH>}<TH className="w-12"><span className="sr-only">Actions</span></TH></tr>
+                  <tr><TH>Event</TH><TH>Client</TH><TH>Date</TH><TH>Type</TH><TH>Booking</TH><TH>Stage</TH><TH>Team</TH>{canFinance && <TH className="text-right">Balance</TH>}<TH className="w-12"><span className="sr-only">Actions</span></TH></tr>
                 </THead>
                 <tbody>
                   {rows.map((p) => (
                     <TR key={p.id}>
-                      <TD><Link to={`/projects/${p.id}`} className="block font-medium hover:underline">{p.name}</Link><span className="text-xs text-ink-muted">{p.project_code}</span></TD>
+                      <TD><Link to={`/events/${p.id}`} className="block font-medium hover:underline">{p.name}</Link><span className="text-xs text-ink-muted">{p.project_code}</span></TD>
                       <TD>{p.client_name}</TD>
                       <TD className="whitespace-nowrap">{p.next_event_at ?? p.first_event_at ? fmtDate((p.next_event_at ?? p.first_event_at)!, tz) : '—'}{p.event_count > 1 && <span className="ml-1 text-xs text-ink-muted">+{p.event_count - 1}</span>}</TD>
                       <TD>{EVENT_TYPE_LABELS[p.event_type]}</TD>
@@ -177,7 +177,7 @@ function ProjectCard({ p, tz, balance, currency, menu }: { p: ProjectOverview; t
   return (
     <Card className="flex h-full flex-col p-4 transition-colors hover:border-line-strong">
       <div className="flex items-start justify-between gap-2">
-        <Link to={`/projects/${p.id}`} className="min-w-0">
+        <Link to={`/events/${p.id}`} className="min-w-0">
           <p className="truncate text-sm font-semibold hover:underline">{p.name}</p>
           <p className="truncate text-xs text-ink-muted">{p.project_code} · {p.client_name}</p>
         </Link>

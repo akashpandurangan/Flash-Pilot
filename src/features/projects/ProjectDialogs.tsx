@@ -48,7 +48,7 @@ export function CancelProjectDialog({ project, open, onOpenChange }: { project: 
         <div className="space-y-3 text-sm">
           <ul className="list-disc space-y-1 pl-5 text-ink-muted">
             <li>The assigned team is notified and their reminders are withdrawn.</li>
-            <li>Reserved equipment is released for other events.</li>
+            <li>Reserved equipment is released for other sessions.</li>
             <li>Payments, notes and history are kept. You can reopen it later as an inquiry.</li>
           </ul>
           <Field label="Reason (optional)">{(a) => <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Client postponed to next year" {...a} />}</Field>
@@ -90,7 +90,7 @@ export function ProductionPlanDialog({ project, open, onOpenChange }: { project:
       >
         <div className="space-y-4">
           {error && <Notice tone="danger">{error}</Notice>}
-          <Field label="Editor" hint="Assigned editors can see this project and update editing progress.">
+          <Field label="Editor" hint="Assigned editors can see this event and update editing progress.">
             {(a) => (
               <Select {...a} value={editor} onChange={(e) => setEditor(e.target.value)}>
                 <option value="">Not assigned</option>
@@ -171,7 +171,7 @@ export function EventTeamDialog({ event, open, onOpenChange }: { event: ProjectE
                 <Select aria-label="Role" className="col-span-2 sm:hidden" value={r.role} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, role: e.target.value as AssignmentRole } : x)))}>
                   {options(ASSIGNMENT_ROLE_LABELS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </Select>
-                {busy.has(r.employee_id) && <p className="col-span-2 text-xs text-warning sm:col-span-3">Already booked on another event at this time.</p>}
+                {busy.has(r.employee_id) && <p className="col-span-2 text-xs text-warning sm:col-span-3">Already booked on another session at this time.</p>}
               </div>
             ))}
             <Button variant="secondary" size="sm" onClick={() => setRows((rs) => [...rs, { employee_id: '', role: 'lead_photographer' }])}><Plus className="size-3.5" /> Assign person</Button>

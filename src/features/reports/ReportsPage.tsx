@@ -67,7 +67,7 @@ export default function ReportsPage() {
   )
   const confirmed = useMemo(() => (projects.data ?? []).filter((p) => p.booking_status === 'confirmed'), [projects.data])
   const finById = useMemo(() => new Map((financials.data ?? []).map((x) => [x.project_id, x])), [financials.data])
-  const link = (p: Pick<ProjectOverview, 'id' | 'name'>) => <Link to={`/projects/${p.id}`} className="font-medium hover:underline">{p.name}</Link>
+  const link = (p: Pick<ProjectOverview, 'id' | 'name'>) => <Link to={`/events/${p.id}`} className="font-medium hover:underline">{p.name}</Link>
 
   const byStatus = useMemo(() => (Object.keys(BOOKING_STATUS_LABELS) as BookingStatus[]).map((s) => {
     const list = inRange.filter((p) => p.booking_status === s)
@@ -119,7 +119,7 @@ export default function ReportsPage() {
         <TabsList>
           <TabsTrigger value="bookings">Bookings</TabsTrigger>
           <TabsTrigger value="stages">Production stages</TabsTrigger>
-          <TabsTrigger value="upcoming">Upcoming events</TabsTrigger>
+          <TabsTrigger value="upcoming">Upcoming sessions</TabsTrigger>
           <TabsTrigger value="team">Team assignments</TabsTrigger>
           {canFinance && <TabsTrigger value="outstanding">Outstanding</TabsTrigger>}
           {canFinance && <TabsTrigger value="received">Payments received</TabsTrigger>}
@@ -128,23 +128,23 @@ export default function ReportsPage() {
         </TabsList>
 
         <TabsContent value="bookings">
-          <Report query={q} rows={byStatus} filename="projects_by_booking_status.csv" empty="No projects" summary={`${inRange.length} projects with events in this period`}
+          <Report query={q} rows={byStatus} filename="events_by_booking_status.csv" empty="No events" summary={`${inRange.length} events with sessions in this period`}
             columns={[
-              { header: 'Booking status', value: (r) => BOOKING_STATUS_LABELS[r.status] }, { header: 'Projects', value: (r) => r.count, align: 'right' },
+              { header: 'Booking status', value: (r) => BOOKING_STATUS_LABELS[r.status] }, { header: 'Events', value: (r) => r.count, align: 'right' },
               ...(canFinance ? [{ header: 'Agreed value', value: (r: (typeof byStatus)[number]) => r.value, render: (r: (typeof byStatus)[number]) => formatMoney(r.value, currency), align: 'right' as const }] : []),
             ]} />
         </TabsContent>
 
         <TabsContent value="stages">
-          <Report query={q} rows={byStage} filename="projects_by_production_stage.csv" empty="No confirmed projects" summary={`${confirmed.length} confirmed projects (all dates)`}
-            columns={[{ header: 'Production stage', value: (r) => PRODUCTION_STAGE_LABELS[r.stage] }, { header: 'Projects', value: (r) => r.count, align: 'right' }]} />
+          <Report query={q} rows={byStage} filename="events_by_production_stage.csv" empty="No confirmed events" summary={`${confirmed.length} confirmed events (all dates)`}
+            columns={[{ header: 'Production stage', value: (r) => PRODUCTION_STAGE_LABELS[r.stage] }, { header: 'Events', value: (r) => r.count, align: 'right' }]} />
         </TabsContent>
 
         <TabsContent value="upcoming">
-          <Report query={events} rows={upcoming} filename="upcoming_events.csv" empty="No upcoming events"
+          <Report query={events} rows={upcoming} filename="upcoming_sessions.csv" empty="No upcoming sessions"
             columns={[
-              { header: 'Date', value: (e) => fmtDate(e.starts_at, tz) }, { header: 'Event', value: (e) => e.title },
-              { header: 'Project', value: (e) => e.project.name, render: (e) => link({ id: e.project_id, name: e.project.name }) },
+              { header: 'Date', value: (e) => fmtDate(e.starts_at, tz) }, { header: 'Session', value: (e) => e.title },
+              { header: 'Event', value: (e) => e.project.name, render: (e) => link({ id: e.project_id, name: e.project.name }) },
               { header: 'Type', value: (e) => EVENT_TYPE_LABELS[e.event_type] }, { header: 'Venue', value: (e) => e.venue_name },
               { header: 'Team', value: (e) => (e.event_assignments ?? []).map((a) => a.employee?.full_name).join('; ') },
               { header: 'Booking', value: (e) => BOOKING_STATUS_LABELS[e.project.booking_status] },
@@ -153,15 +153,15 @@ export default function ReportsPage() {
 
         <TabsContent value="team">
           <Report query={events} rows={workload} filename="employee_assignments.csv" empty="No assignments" summary={`${workload.reduce((s, w) => s + w.events, 0)} assignments in this period`}
-            columns={[{ header: 'Team member', value: (w) => w.name }, { header: 'Role', value: (w) => w.role }, { header: 'Events', value: (w) => w.events, align: 'right' }, { header: 'Projects', value: (w) => w.projects.size, align: 'right' }]} />
+            columns={[{ header: 'Team member', value: (w) => w.name }, { header: 'Role', value: (w) => w.role }, { header: 'Sessions', value: (w) => w.events, align: 'right' }, { header: 'Events', value: (w) => w.projects.size, align: 'right' }]} />
         </TabsContent>
 
         {canFinance && (
           <TabsContent value="outstanding">
             <Report query={financials.isError ? financials : projects} rows={outstanding} filename="outstanding_payments.csv" empty="Nothing outstanding"
-              summary={<>Total outstanding: <span className="font-semibold text-ink">{formatMoney(outstanding.reduce((s, x) => s + Number(x.fin.balance), 0), currency)}</span> across {outstanding.length} projects</>}
+              summary={<>Total outstanding: <span className="font-semibold text-ink">{formatMoney(outstanding.reduce((s, x) => s + Number(x.fin.balance), 0), currency)}</span> across {outstanding.length} events</>}
               columns={[
-                { header: 'Project', value: (x) => x.p.name, render: (x) => link(x.p) }, { header: 'Client', value: (x) => x.p.client_name },
+                { header: 'Event', value: (x) => x.p.name, render: (x) => link(x.p) }, { header: 'Client', value: (x) => x.p.client_name },
                 { header: 'Agreed', value: (x) => Number(x.fin.agreed_amount), render: (x) => formatMoney(Number(x.fin.agreed_amount), currency), align: 'right' },
                 { header: 'Received', value: (x) => Number(x.fin.paid_amount), render: (x) => formatMoney(Number(x.fin.paid_amount), currency), align: 'right' },
                 { header: 'Balance', value: (x) => Number(x.fin.balance), render: (x) => formatMoney(Number(x.fin.balance), currency), align: 'right' },
@@ -175,7 +175,7 @@ export default function ReportsPage() {
             <Report query={payments} rows={(payments.data ?? []).filter((p) => p.status === 'valid')} filename={`payments_received_${f.from}_to_${f.to}.csv`} empty="No payments in this period"
               summary={<>Received: <span className="font-semibold text-ink">{formatMoney((payments.data ?? []).filter((p) => p.status === 'valid').reduce((s, p) => s + Number(p.amount), 0), currency)}</span></>}
               columns={[
-                { header: 'Date', value: (p) => p.paid_on, render: (p) => fmtDateOnly(p.paid_on) }, { header: 'Project', value: (p) => p.project?.name, render: (p) => (p.project ? link(p.project) : '—') },
+                { header: 'Date', value: (p) => p.paid_on, render: (p) => fmtDateOnly(p.paid_on) }, { header: 'Event', value: (p) => p.project?.name, render: (p) => (p.project ? link(p.project) : '—') },
                 { header: 'Amount', value: (p) => Number(p.amount), render: (p) => formatMoney(Number(p.amount), currency), align: 'right' },
                 { header: 'Method', value: (p) => PAYMENT_METHOD_LABELS[p.method] }, { header: 'Reference', value: (p) => p.reference }, { header: 'Recorded by', value: (p) => p.recorded_by_name },
               ]} />
@@ -183,17 +183,17 @@ export default function ReportsPage() {
         )}
 
         <TabsContent value="delivery">
-          <Report query={q} rows={pendingDelivery} filename="projects_pending_delivery.csv" empty="Nothing waiting for delivery" summary={`${pendingDelivery.length} projects shot but not yet delivered`}
+          <Report query={q} rows={pendingDelivery} filename="events_pending_delivery.csv" empty="Nothing waiting for delivery" summary={`${pendingDelivery.length} events shot but not yet delivered`}
             columns={[
-              { header: 'Project', value: (p) => p.name, render: (p) => link(p) }, { header: 'Client', value: (p) => p.client_name }, { header: 'Stage', value: (p) => PRODUCTION_STAGE_LABELS[p.production_stage] },
+              { header: 'Event', value: (p) => p.name, render: (p) => link(p) }, { header: 'Client', value: (p) => p.client_name }, { header: 'Stage', value: (p) => PRODUCTION_STAGE_LABELS[p.production_stage] },
               { header: 'Editing due', value: (p) => p.editing_due_date, render: (p) => fmtDateOnly(p.editing_due_date) }, { header: 'Delivery due', value: (p) => p.delivery_due_date, render: (p) => fmtDateOnly(p.delivery_due_date) },
             ]} />
         </TabsContent>
 
         <TabsContent value="overdue">
-          <Report query={q} rows={overdue} filename="overdue_editing_and_delivery.csv" empty="Nothing is overdue" summary={`${overdue.length} projects past an editing or delivery deadline`}
+          <Report query={q} rows={overdue} filename="overdue_editing_and_delivery.csv" empty="Nothing is overdue" summary={`${overdue.length} events past an editing or delivery deadline`}
             columns={[
-              { header: 'Project', value: (p) => p.name, render: (p) => link(p) }, { header: 'Client', value: (p) => p.client_name }, { header: 'Stage', value: (p) => PRODUCTION_STAGE_LABELS[p.production_stage] },
+              { header: 'Event', value: (p) => p.name, render: (p) => link(p) }, { header: 'Client', value: (p) => p.client_name }, { header: 'Stage', value: (p) => PRODUCTION_STAGE_LABELS[p.production_stage] },
               { header: 'Editing overdue', value: (p) => (p.editing_due_date && p.editing_due_date < today && !p.editing_completed_at ? p.editing_due_date : ''), render: (p) => (p.editing_due_date && p.editing_due_date < today && !p.editing_completed_at ? <Badge tone="danger">Since {fmtDateOnly(p.editing_due_date)}</Badge> : '—') },
               { header: 'Delivery overdue', value: (p) => (p.delivery_due_date && p.delivery_due_date < today ? p.delivery_due_date : ''), render: (p) => (p.delivery_due_date && p.delivery_due_date < today ? <Badge tone="danger">Since {fmtDateOnly(p.delivery_due_date)}</Badge> : '—') },
             ]} />

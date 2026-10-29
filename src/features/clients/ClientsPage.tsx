@@ -32,7 +32,7 @@ export default function ClientsPage() {
   const archive = useMutation({
     mutationFn: ({ id, archived }: { id: string; archived: boolean }) => setClientArchived(id, archived),
     onSuccess: (_d, v) => {
-      toast.success(v.archived ? 'Client archived. Their projects and payments are kept.' : 'Client restored')
+      toast.success(v.archived ? 'Client archived. Their events and payments are kept.' : 'Client restored')
       void qc.invalidateQueries({ queryKey: ['clients'] })
     },
     onError: (e) => toast.error(errorMessage(e)),
@@ -46,7 +46,7 @@ export default function ClientsPage() {
     <>
       <PageHeader
         title="Clients"
-        description="Everyone you shoot for, with their projects and balances."
+        description="Everyone you shoot for, with their events and balances."
         actions={canManage && <Button onClick={() => setEditing('new')}><Plus className="size-4" /> New client</Button>}
       />
       <FilterBar>
@@ -74,7 +74,7 @@ export default function ClientsPage() {
             <EmptyState
               icon={<Contact />}
               title="Add your first client"
-              description="Clients hold contact details and every project you do for them."
+              description="Clients hold contact details and every event you do for them."
               action={canManage && <Button onClick={() => setEditing('new')}><Plus className="size-4" /> New client</Button>}
             />
           )

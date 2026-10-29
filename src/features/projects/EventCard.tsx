@@ -47,12 +47,12 @@ export function EventCard({ index, control, register, setValue, errors, employee
 
   return (
     <fieldset className="rounded-lg border border-line">
-      <legend className="sr-only">Event {index + 1}: {title}</legend>
+      <legend className="sr-only">Session {index + 1}: {title}</legend>
       <div className="flex items-center justify-between gap-3 border-b border-line bg-sidebar px-4 py-2.5">
-        <div className="flex items-center gap-2 text-sm font-semibold"><CalendarClock className="size-4 text-ink-muted" aria-hidden /> Event {index + 1}</div>
+        <div className="flex items-center gap-2 text-sm font-semibold"><CalendarClock className="size-4 text-ink-muted" aria-hidden /> Session {index + 1}</div>
         {canRemove && (
           <Button variant="ghost" size="sm" className="text-danger hover:bg-danger-soft" onClick={onRemove}>
-            <Trash2 className="size-3.5" /> {persisted ? 'Cancel event' : 'Remove'}
+            <Trash2 className="size-3.5" /> {persisted ? 'Cancel session' : 'Remove'}
           </Button>
         )}
       </div>
@@ -66,7 +66,7 @@ export function EventCard({ index, control, register, setValue, errors, employee
         )}
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Event name" error={e?.title?.message} required className="lg:col-span-2">{(a) => <Input {...a} {...register(`events.${index}.title`)} />}</Field>
+          <Field label="Session name" error={e?.title?.message} required className="lg:col-span-2">{(a) => <Input {...a} {...register(`events.${index}.title`)} />}</Field>
           <Field label="Type" error={e?.event_type?.message}>
             {(a) => (
               <Select
@@ -88,7 +88,7 @@ export function EventCard({ index, control, register, setValue, errors, employee
           <Field label="Venue name" error={e?.venue_name?.message}>{(a) => <Input placeholder="e.g. The Grand Hall" {...a} {...register(`events.${index}.venue_name`)} />}</Field>
           <Field label="Map / location link" error={e?.map_url?.message}>{(a) => <Input type="url" inputMode="url" placeholder="https://maps.app.goo.gl/…" {...a} {...register(`events.${index}.map_url`)} />}</Field>
           <Field label="Full venue address" error={e?.venue_address?.message} className="sm:col-span-2">{(a) => <Textarea rows={2} {...a} {...register(`events.${index}.venue_address`)} />}</Field>
-          <Field label="Event notes" hint="Shared with the assigned team in reminders." error={e?.notes?.message} className="sm:col-span-2">{(a) => <Textarea rows={2} {...a} {...register(`events.${index}.notes`)} />}</Field>
+          <Field label="Session notes" hint="Shared with the assigned team in reminders." error={e?.notes?.message} className="sm:col-span-2">{(a) => <Textarea rows={2} {...a} {...register(`events.${index}.notes`)} />}</Field>
         </div>
 
         {/* team */}
@@ -98,7 +98,7 @@ export function EventCard({ index, control, register, setValue, errors, employee
             <Button variant="secondary" size="sm" onClick={() => assignments.append({ employee_id: '', role: 'lead_photographer' })}><UserPlus className="size-3.5" /> Assign person</Button>
           </div>
           {assignments.fields.length === 0 && (
-            <p className="rounded-md border border-dashed border-line-strong px-3 py-4 text-center text-[13px] text-ink-muted">No one assigned yet. You can assign people now or after the project is created.</p>
+            <p className="rounded-md border border-dashed border-line-strong px-3 py-4 text-center text-[13px] text-ink-muted">No one assigned yet. You can assign people now or after the event is created.</p>
           )}
           {assignments.fields.length > 0 && photographers === 0 && <p className="mb-2 flex items-center gap-1.5 text-xs text-warning"><AlertTriangle className="size-3.5" aria-hidden /> No photographer assigned yet.</p>}
           <div className="space-y-2">
@@ -150,7 +150,7 @@ export function EventCard({ index, control, register, setValue, errors, employee
               <Button variant="secondary" size="sm" onClick={() => equipment.append({ equipment_id: '', custom_name: '', quantity: '1', notes: '' })}><Plus className="size-3.5" /> Add equipment</Button>
             </div>
           </div>
-          {equipment.fields.length === 0 && <p className="rounded-md border border-dashed border-line-strong px-3 py-4 text-center text-[13px] text-ink-muted">No equipment reserved for this event.</p>}
+          {equipment.fields.length === 0 && <p className="rounded-md border border-dashed border-line-strong px-3 py-4 text-center text-[13px] text-ink-muted">No equipment reserved for this session.</p>}
           <div className="space-y-3">
             {equipment.fields.map((f, j) => {
               const err = e?.equipment?.[j]
@@ -175,7 +175,7 @@ export function EventCard({ index, control, register, setValue, errors, employee
                   {row?.equipment_id === '' ? (
                     <Field label="Describe the item" error={err?.custom_name?.message}>{(a) => <Input placeholder="e.g. Rented fog machine" {...a} {...register(`events.${index}.equipment.${j}.custom_name`)} />}</Field>
                   ) : (
-                    <Field label="Note for this event" error={err?.notes?.message}>{(a) => <Input placeholder="Optional" {...a} {...register(`events.${index}.equipment.${j}.notes`)} />}</Field>
+                    <Field label="Note for this session" error={err?.notes?.message}>{(a) => <Input placeholder="Optional" {...a} {...register(`events.${index}.equipment.${j}.notes`)} />}</Field>
                   )}
                   <div className="flex items-end"><Button variant="ghost" size="icon" onClick={() => equipment.remove(j)} aria-label="Remove equipment"><Trash2 className="size-4" /></Button></div>
                   {short && <p className="flex items-center gap-1.5 text-xs text-warning sm:col-span-4"><AlertTriangle className="size-3.5" aria-hidden /> Not enough units free at this time - {item?.quantity_owned} owned, {elsewhere} reserved elsewhere.</p>}

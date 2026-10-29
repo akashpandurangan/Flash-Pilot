@@ -37,7 +37,7 @@ describe('project form validation', () => {
       events: [{ ...e, end_time: e.start_time, map_url: 'not a url', assignments: [{ employee_id: 'e1', role: 'lead_photographer' }, { employee_id: 'e1', role: 'assistant' }] }],
     }))
     const msgs = (bad.error?.issues ?? []).map((i) => i.message)
-    expect(msgs).toEqual(expect.arrayContaining(['End time must differ from the start time', 'Enter a full link starting with https://', 'Already assigned to this event']))
+    expect(msgs).toEqual(expect.arrayContaining(['End time must differ from the start time', 'Enter a full link starting with https://', 'Already assigned to this session']))
   })
 
   it('blocks an advance larger than the project amount unless explicitly confirmed', () => {

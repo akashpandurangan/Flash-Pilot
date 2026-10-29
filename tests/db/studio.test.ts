@@ -1,4 +1,6 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createDb, type TestDb } from './harness'
 
@@ -563,6 +565,52 @@ describe('reminders & notifications', () => {
   it('a person cannot edit someone else\'s preferences', async () => {
     const msg = await t.as(ids.photo1, () => t.fails(`insert into public.notification_preferences (user_id, studio_id) values ($1,$2)`, [ids.photo2, ids.studio]))
     expect(msg).toMatch(/row-level security/)
+  })
+})
+
+describe('Events / Sessions wording (migration 07)', () => {
+  it('notifications, activity and errors use the new terms and /events links', async () => {
+    const project = await saveProject(ids.owner, payload({
+      project: { name: 'Wording Check' }, initial_payment: null,
+      events: [{ title: 'Haldi', starts_at: hours(10), ends_at: hours(14), venue_name: 'Farmhouse', assignments: [{ employee_id: ids.photo1Emp, role: 'lead_photographer' }] }],
+    }))
+    const event = (await t.one<{ id: string }>(`select id from public.project_events where project_id=$1`, [project])).id
+    await t.db.query(`select public.process_due_notifications()`)
+
+    const n = await t.one<{ body: string; link: string }>(`select body, link from public.notifications where event_id=$1 and type='event_reminder' and recipient_employee_id=$2`, [event, ids.photo1Emp])
+    expect(n.link).toBe(`/events/${project}`)
+    expect(n.body).toContain('Event: Wording Check (FP-')
+    expect(n.body).toContain('Session: Haldi')
+    expect(n.body).not.toMatch(/Project:/)
+
+    const assigned = await t.one<{ link: string }>(`select link from public.notifications where event_id=$1 and type='new_assignment' and recipient_employee_id=$2`, [event, ids.photo1Emp])
+    expect(assigned.link).toBe(`/events/${project}`)
+
+    const log = await t.one<{ summary: string }>(`select summary from public.activity_logs where project_id=$1 and action='project_created'`, [project])
+    expect(log.summary).toBe('Event created: Wording Check')
+
+    expect(await t.as(ids.owner, () => t.fails(`select public.save_project(null,$1::jsonb)`, [JSON.stringify(payload({ events: [] }))]))).toMatch(/add at least one session/)
+
+    await q(ids.owner, `update public.project_events set cancelled_at=now() where id=$1`, [event])
+    const cancelled = await t.one<{ summary: string }>(`select summary from public.activity_logs where project_id=$1 and action='event_cancelled'`, [project])
+    expect(cancelled.summary).toBe('Session cancelled: Haldi')
+  })
+
+  it('rewrites links and log wording that were stored before the rename, and is safe to run twice', async () => {
+    const fix = readFileSync(path.resolve(import.meta.dirname, '../../supabase/migrations/20260101000007_event_terminology.sql'), 'utf8')
+    const dataFix = fix.slice(fix.indexOf('-- ------------------------------------------------------------------ existing data'))
+    expect(dataFix).toContain('update public.notifications')
+
+    await t.db.query(`insert into public.notifications (studio_id, recipient_employee_id, type, title, link, dedupe_key) values ($1,$2,'new_assignment','legacy','/projects/abc-123','legacy-link-1')`, [ids.studio, ids.ownerEmp])
+    await t.db.query(`insert into public.activity_logs (studio_id, entity_type, action, summary) values ($1,'legacy-test','project_created','Project created: Legacy'), ($1,'legacy-test','event_cancelled','Event cancelled: Old'), ($1,'legacy-test','x','Project delivered')`, [ids.studio])
+
+    await t.db.exec(dataFix)
+    await t.db.exec(dataFix) // idempotent
+
+    expect((await t.one<{ link: string }>(`select link from public.notifications where dedupe_key='legacy-link-1'`)).link).toBe('/events/abc-123')
+    const summaries = (await t.rows<{ summary: string }>(`select summary from public.activity_logs where entity_type='legacy-test'`)).map((r) => r.summary).sort()
+    expect(summaries).toEqual(['Event created: Legacy', 'Event delivered', 'Session cancelled: Old'])
+    expect(await t.rows(`select 1 from public.notifications where link like '/projects/%'`)).toHaveLength(0)
   })
 })
 

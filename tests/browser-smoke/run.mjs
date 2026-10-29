@@ -83,17 +83,20 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await shot(page, '01-login')
 
   // protected route redirects to login
-  await page.goto(`${BASE}/projects`)
+  await page.goto(`${BASE}/events`)
   await page.waitForURL(/\/login/)
-  check('anonymous visit to /projects redirects to /login', true)
+  check('anonymous visit to /events redirects to /login', true)
 
   await login(page)
-  check('after login the user returns to the page they were heading to', new URL(page.url()).pathname === '/projects')
+  check('after login the user returns to the page they were heading to', new URL(page.url()).pathname === '/events')
+  await page.goto(`${BASE}/projects/${ids.p1}?tab=payments`)
+  await page.waitForURL(/\/events\//)
+  check('an old /projects link is forwarded to /events (id and query kept)', new URL(page.url()).pathname === `/events/${ids.p1}` && new URL(page.url()).search === '?tab=payments')
   await page.goto(`${BASE}/`)
   await page.getByRole('heading', { level: 1 }).waitFor()
   check('dashboard greets the user', /Good (morning|afternoon|evening), Olivia/.test(await page.getByRole('heading', { level: 1 }).innerText()))
   await page.waitForTimeout(600)
-  check('dashboard shows KPI numbers from the API', (await page.getByText('Active projects').count()) > 0 && (await page.getByText('₹1,50,000').count()) > 0)
+  check('dashboard shows KPI numbers from the API', (await page.getByText('Active events').count()) > 0 && (await page.getByText('₹1,50,000').count()) > 0)
   check('dashboard lists upcoming events', (await page.getByText('Mehta Corporate Launch').count()) > 0)
   check('dashboard flags the double-booked photographer in Action required', (await page.getByText('Riya Kapoor is double-booked').count()) > 0)
   check('dashboard flags overdue editing', (await page.getByText(/Editing overdue/).count()) > 0)
@@ -101,16 +104,16 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await shot(page, '02-dashboard')
 
   const owner = [
-    ['/projects', '03-projects', 'Sharma–Rao Wedding'],
-    ['/projects/new', '04-project-new', 'Project details'],
-    [`/projects/${ids.p1}`, '05-project-detail', 'Wedding ceremony'],
-    [`/projects/${ids.p1}/edit`, '06-project-edit', 'Project details'],
+    ['/events', '03-projects', 'Sharma–Rao Wedding'],
+    ['/events/new', '04-project-new', 'Event details'],
+    [`/events/${ids.p1}`, '05-project-detail', 'Wedding ceremony'],
+    [`/events/${ids.p1}/edit`, '06-project-edit', 'Event details'],
     ['/calendar', '07-calendar-month', 'Scheduling warnings'],
     ['/clients', '08-clients', 'Anita Sharma'],
     [`/clients/${ids.c1}`, '09-client-detail', 'Contact'],
     ['/team', '10-team', 'Riya Kapoor'],
     ['/equipment', '11-equipment', 'Sony A7 IV'],
-    ['/payments', '12-payments', 'Project balances'],
+    ['/payments', '12-payments', 'Event balances'],
     ['/notifications', '13-notifications', 'Reminder: Product launch'],
     ['/reports', '14-reports', 'Reports'],
     ['/settings', '15-settings', 'Studio details'],
@@ -140,10 +143,10 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await page.getByRole('heading', { level: 1 }).waitFor()
   await page.waitForTimeout(500)
   await page.keyboard.press('Control+k')
-  await page.getByPlaceholder('Search projects, clients, team…').fill('sharma')
+  await page.getByPlaceholder('Search events, clients, team…').fill('sharma')
   await page.waitForTimeout(700)
   await shot(page, '17-search')
-  check('Ctrl+K opens global search', (await page.getByPlaceholder('Search projects, clients, team…').count()) === 1)
+  check('Ctrl+K opens global search', (await page.getByPlaceholder('Search events, clients, team…').count()) === 1)
   await page.keyboard.press('Escape')
 
   // notification bell
@@ -154,10 +157,10 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await page.keyboard.press('Escape')
 
   // project form validation
-  await page.goto(`${BASE}/projects/new`)
-  await page.getByRole('button', { name: 'Create project' }).click()
+  await page.goto(`${BASE}/events/new`)
+  await page.getByRole('button', { name: 'Create event' }).click()
   await page.waitForTimeout(400)
-  check('empty project form shows inline errors', (await page.getByText('Choose a client').count()) > 0 && (await page.getByText('Give the project a name').count()) > 0 && (await page.getByText('Choose the event date').count()) > 0)
+  check('empty project form shows inline errors', (await page.getByText('Choose a client').count()) > 0 && (await page.getByText('Give the event a name').count()) > 0 && (await page.getByText('Choose the session date').count()) > 0)
   await shot(page, '19-project-form-errors')
 
   // client dialog + duplicate warning
@@ -171,10 +174,10 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await page.keyboard.press('Escape')
 
   // project detail tabs
-  await page.goto(`${BASE}/projects/${ids.p1}?tab=production`)
+  await page.goto(`${BASE}/events/${ids.p1}?tab=production`)
   await page.getByText('Production checklist').waitFor()
   await shot(page, '21-project-production')
-  await page.goto(`${BASE}/projects/${ids.p1}?tab=payments`)
+  await page.goto(`${BASE}/events/${ids.p1}?tab=payments`)
   await page.getByText('Payment history').waitFor()
   await shot(page, '22-project-payments')
   await page.getByRole('button', { name: /Record payment/ }).first().click()
@@ -183,7 +186,7 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   check('payment dialog warns when the amount exceeds the balance', (await page.getByText(/more than the balance/).count()) > 0)
   await shot(page, '23-payment-overpay')
   await page.keyboard.press('Escape')
-  await page.goto(`${BASE}/projects/${ids.p1}?tab=activity`)
+  await page.goto(`${BASE}/events/${ids.p1}?tab=activity`)
   await page.getByText('Moved into editing').waitFor()
   check('activity timeline shows who/when', (await page.getByText(/Olivia Mehra ·/).count()) > 0)
 
@@ -215,7 +218,7 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await shot(page, '31-mobile-nav')
   check('mobile drawer lists every section for the owner', (await page.getByRole('navigation', { name: 'Main' }).getByRole('link').count()) === 10)
   await page.keyboard.press('Escape')
-  for (const [path, name] of [['/projects', '32-mobile-projects'], ['/projects/new', '33-mobile-project-form'], [`/projects/${ids.p1}`, '34-mobile-project-detail'], ['/clients', '35-mobile-clients'], ['/calendar', '36-mobile-calendar'], ['/team', '37-mobile-team'], ['/payments', '38-mobile-payments']]) {
+  for (const [path, name] of [['/events', '32-mobile-projects'], ['/events/new', '33-mobile-project-form'], [`/events/${ids.p1}`, '34-mobile-project-detail'], ['/clients', '35-mobile-clients'], ['/calendar', '36-mobile-calendar'], ['/team', '37-mobile-team'], ['/payments', '38-mobile-payments']]) {
     await page.goto(`${BASE}${path}`)
     await page.waitForTimeout(700)
     const o = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
@@ -230,7 +233,7 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await login(page)
   await page.waitForTimeout(700)
   await shot(page, '40-tablet-dashboard')
-  await page.goto(`${BASE}/projects`)
+  await page.goto(`${BASE}/events`)
   await page.waitForTimeout(700)
   const o = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
   check('tablet projects list fits the screen width', !o)
@@ -244,17 +247,17 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await page.getByRole('heading', { level: 1 }).waitFor()
   await page.waitForTimeout(600)
   const nav = await page.getByRole('navigation', { name: 'Main' }).getByRole('link').allInnerTexts()
-  check('photographer sees only Overview, Projects, Calendar, Notifications', JSON.stringify(nav.map((s) => s.trim())) === JSON.stringify(['Overview', 'Projects', 'Calendar', 'Notifications']), nav.join(', '))
+  check('photographer sees only Overview, Events, Calendar, Notifications', JSON.stringify(nav.map((s) => s.trim())) === JSON.stringify(['Overview', 'Events', 'Calendar', 'Notifications']), nav.join(', '))
   check('photographer dashboard hides money', (await page.getByText('Outstanding').count()) === 0)
   check('photographer dashboard has no "Action required" panel', (await page.getByText('Action required').count()) === 0)
   await shot(page, '50-photographer-dashboard')
-  for (const path of ['/payments', '/clients', '/team', '/reports', '/settings', '/equipment', '/projects/new']) {
+  for (const path of ['/payments', '/clients', '/team', '/reports', '/settings', '/equipment', '/events/new']) {
     await page.goto(`${BASE}${path}`)
     await page.waitForTimeout(400)
     check(`photographer is blocked from ${path}`, (await page.getByText("You don't have access to this page").count()) > 0)
   }
   await shot(page, '51-photographer-blocked')
-  await page.goto(`${BASE}/projects/${ids.p1}`)
+  await page.goto(`${BASE}/events/${ids.p1}`)
   await page.getByText('Wedding ceremony').first().waitFor()
   const tabs = await page.getByRole('tab').allInnerTexts()
   check('photographer project page has no Payments tab', !tabs.includes('Payments'), tabs.join(', '))

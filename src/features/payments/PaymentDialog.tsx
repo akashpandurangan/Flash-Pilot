@@ -114,7 +114,7 @@ export function PaymentDialog({ target, onOpenChange }: { target: PaymentTarget 
             <Checkbox label="This is the advance payment" {...register('is_advance')} />
             {over > 0 && (
               <Notice tone="warning" title={`${formatMoney(over, currency)} more than the balance`}>
-                {target.agreed === 0 ? 'No project amount has been set yet. ' : ''}
+                {target.agreed === 0 ? 'No event amount has been set yet. ' : ''}
                 Recording this will leave the client with a credit of {formatMoney(over, currency)}.
                 <div className="mt-2.5">
                   <Checkbox label="Yes, record it anyway" checked={confirmOver} onChange={(e) => setConfirmOver(e.target.checked)} />

@@ -14,14 +14,14 @@ const TOKEN_MESSAGES: Record<string, string> = {
   overpayment: 'This payment is more than the outstanding balance.',
   invalid_amount: 'Enter an amount greater than zero with at most two decimal places.',
   invalid_client: 'Choose a client from this studio.',
-  events_required: 'Add at least one event.',
+  events_required: 'Add at least one session.',
   invalid_transition: 'That step is not available right now.',
   booking_not_confirmed: 'Confirm the booking before changing production.',
   delivery_details_required: 'Record the delivery method and date first.',
   employee_inactive: 'That team member is deactivated and cannot be assigned.',
   owner_protected: 'The studio owner cannot be demoted or deactivated.',
   studio_exists: 'You already have a studio.',
-  project_archived: 'This project is archived.',
+  project_archived: 'This event is archived.',
   invalid_timezone: 'That time zone is not recognised.',
 }
 

@@ -52,7 +52,7 @@ export default function ProjectDetailPage() {
   })
   const archive = useMutation({
     mutationFn: (archived: boolean) => setProjectArchived(id, archived),
-    onSuccess: (_d, archived) => { toast.success(archived ? 'Project archived' : 'Project restored'); invalidate() },
+    onSuccess: (_d, archived) => { toast.success(archived ? 'Event archived' : 'Event restored'); invalidate() },
     onError: (e) => toast.error(errorMessage(e)),
   })
 
@@ -60,7 +60,7 @@ export default function ProjectDetailPage() {
   if (project.isError) return <ErrorState error={project.error} onRetry={() => void project.refetch()} />
   const p = project.data
   if (!p) {
-    return <EmptyState title="Project not found" description="It may have been removed, or you may not have access to it." action={<Button variant="secondary" asChild><Link to="/projects">Back to projects</Link></Button>} />
+    return <EmptyState title="Event not found" description="It may have been removed, or you may not have access to it." action={<Button variant="secondary" asChild><Link to="/events">Back to events</Link></Button>} />
   }
 
   const o = overview.data
@@ -74,7 +74,7 @@ export default function ProjectDetailPage() {
   const nextStep = (() => {
     if (!saved || dismissed || !canManage) return null
     if (p.booking_status === 'inquiry') return { text: 'Next: confirm the booking so the team is notified and reminders are scheduled.', action: <Button size="sm" loading={status.isPending} onClick={() => status.mutate('confirmed')}><CalendarCheck className="size-4" /> Confirm booking</Button> }
-    if (unstaffed.length > 0) return { text: 'Next: assign a photographer to every event.', action: <Button size="sm" variant="secondary" onClick={() => setTeamEvent(unstaffed[0]!)}><Users className="size-4" /> Assign team</Button> }
+    if (unstaffed.length > 0) return { text: 'Next: assign a photographer to every session.', action: <Button size="sm" variant="secondary" onClick={() => setTeamEvent(unstaffed[0]!)}><Users className="size-4" /> Assign team</Button> }
     if (canFinance && summary && summary.paid === 0 && summary.agreed > 0) return { text: 'Next: record the advance when it arrives.', action: <Button size="sm" variant="secondary" onClick={() => setUrl({ tab: 'payments' })}>Open payments</Button> }
     return null
   })()
@@ -82,7 +82,7 @@ export default function ProjectDetailPage() {
   return (
     <>
       <PageHeader
-        breadcrumbs={[{ label: 'Projects', to: '/projects' }, { label: p.name }]}
+        breadcrumbs={[{ label: 'Events', to: '/events' }, { label: p.name }]}
         title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1">{p.name}<span className="text-sm font-normal text-ink-muted">{p.project_code}</span></span>}
         description={
           <span className="flex flex-wrap items-center gap-2">
@@ -96,7 +96,7 @@ export default function ProjectDetailPage() {
         actions={canManage && (
           <>
             {p.booking_status === 'inquiry' && !frozen && <Button onClick={() => status.mutate('confirmed')} loading={status.isPending}><CalendarCheck className="size-4" /> Confirm booking</Button>}
-            {!frozen && p.booking_status !== 'cancelled' && <Button variant="secondary" asChild><Link to={`/projects/${p.id}/edit`}><Pencil className="size-4" /> Edit</Link></Button>}
+            {!frozen && p.booking_status !== 'cancelled' && <Button variant="secondary" asChild><Link to={`/events/${p.id}/edit`}><Pencil className="size-4" /> Edit</Link></Button>}
             {p.booking_status === 'cancelled' && !frozen && <Button variant="secondary" onClick={() => status.mutate('inquiry')} loading={status.isPending}><RotateCcw className="size-4" /> Reopen as inquiry</Button>}
             <Menu>
               <MenuTrigger asChild><Button variant="secondary" size="icon" aria-label="More actions"><MoreHorizontal className="size-4" /></Button></MenuTrigger>
@@ -104,7 +104,7 @@ export default function ProjectDetailPage() {
                 {p.booking_status === 'confirmed' && p.production_stage === 'upcoming' && !frozen && <MenuItem icon={<RotateCcw />} onSelect={() => status.mutate('inquiry')}>Move back to inquiry</MenuItem>}
                 {p.booking_status !== 'cancelled' && !frozen && <MenuItem danger icon={<Ban />} onSelect={() => setCancelOpen(true)}>Cancel booking…</MenuItem>}
                 {p.booking_status !== 'cancelled' && !frozen && <MenuSeparator />}
-                <MenuItem icon={frozen ? <ArchiveRestore /> : <Archive />} onSelect={() => archive.mutate(!frozen)}>{frozen ? 'Restore from archive' : 'Archive project'}</MenuItem>
+                <MenuItem icon={frozen ? <ArchiveRestore /> : <Archive />} onSelect={() => archive.mutate(!frozen)}>{frozen ? 'Restore from archive' : 'Archive event'}</MenuItem>
               </MenuContent>
             </Menu>
           </>
@@ -114,7 +114,7 @@ export default function ProjectDetailPage() {
       {nextStep && (
         <Notice
           tone="success"
-          title={saved === 'created' ? 'Project created' : 'Changes saved'}
+          title={saved === 'created' ? 'Event created' : 'Changes saved'}
           className="mb-4"
           action={<div className="flex items-center gap-1">{nextStep.action}<Button variant="ghost" size="icon-sm" aria-label="Dismiss" onClick={() => setDismissed(true)}><X className="size-4" /></Button></div>}
         >
@@ -122,7 +122,7 @@ export default function ProjectDetailPage() {
         </Notice>
       )}
       {p.booking_status === 'cancelled' && <Notice tone="danger" title="This booking is cancelled" className="mb-4">{p.cancel_reason ? `Reason: ${p.cancel_reason}. ` : ''}Reminders are withdrawn and equipment is released. Payments and history are kept.</Notice>}
-      {frozen && <Notice tone="warning" className="mb-4">This project is archived and read-only. Restore it from the menu to make changes.</Notice>}
+      {frozen && <Notice tone="warning" className="mb-4">This event is archived and read-only. Restore it from the menu to make changes.</Notice>}
 
       {p.booking_status === 'confirmed' && <StageStepper stage={p.production_stage} className="mb-5" />}
 
@@ -141,7 +141,7 @@ export default function ProjectDetailPage() {
                 <EventPanel key={e.id} event={e} tz={tz} canManage={canManage && !frozen && p.booking_status !== 'cancelled'} reminders={reminders.data?.filter((r) => r.event_id === e.id)} onTeam={() => setTeamEvent(e)} booking={p.booking_status} archived={frozen} />
               ))}
               {cancelledEvents.length > 0 && (
-                <Panel title="Cancelled events" description="Kept for history. Their reminders and equipment reservations were released.">
+                <Panel title="Cancelled sessions" description="Kept for history. Their reminders and equipment reservations were released.">
                   <ul className="space-y-1 text-sm text-ink-muted">{cancelledEvents.map((e) => <li key={e.id}><span className="line-through">{e.title}</span> · {fmtDate(e.starts_at, tz)}</li>)}</ul>
                 </Panel>
               )}
@@ -190,7 +190,7 @@ export default function ProjectDetailPage() {
         <TabsContent value="production"><ProductionTab project={p} balance={summary ? summary.balance : null} /></TabsContent>
         {canFinance && <TabsContent value="payments"><ProjectPaymentsTab project={p} /></TabsContent>}
         <TabsContent value="activity">
-          <Panel title="Activity" description={role === 'owner' || role === 'manager' ? 'Every change, with who made it and when.' : 'Updates on this project.'} bodyClassName="p-0">
+          <Panel title="Activity" description={role === 'owner' || role === 'manager' ? 'Every change, with who made it and when.' : 'Updates on this event.'} bodyClassName="p-0">
             <ActivityTimeline query={activity} />
           </Panel>
         </TabsContent>

@@ -44,10 +44,10 @@ describe('permission matrix', () => {
 
   it('hides navigation the role cannot use', () => {
     const labels = (a: Actor) => visibleNav(a).map((n) => n.label)
-    expect(labels(owner)).toEqual(['Overview', 'Projects', 'Calendar', 'Clients', 'Team', 'Equipment', 'Payments', 'Notifications', 'Reports', 'Studio Settings'])
+    expect(labels(owner)).toEqual(['Overview', 'Events', 'Calendar', 'Clients', 'Team', 'Equipment', 'Payments', 'Notifications', 'Reports', 'Studio Settings'])
     expect(labels(managerNoFin)).not.toContain('Payments')
     expect(labels(managerFin)).toContain('Payments')
-    expect(labels(photographer)).toEqual(['Overview', 'Projects', 'Calendar', 'Notifications'])
+    expect(labels(photographer)).toEqual(['Overview', 'Events', 'Calendar', 'Notifications'])
   })
 
   it('limits checklist phases by role', () => {

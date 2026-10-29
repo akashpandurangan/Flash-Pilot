@@ -42,7 +42,7 @@ export function buildActionItems(input: ActionInput): ActionItem[] {
     items.push({
       id: `unstaffed:${c.event.id}`, kind: 'unstaffed', severity: soon ? 'high' : 'medium',
       title: `No photographer for ${c.event.projectName}`,
-      detail: `${c.event.title} · ${fmtDate(c.event.startsAt, input.tz)}`, href: `/projects/${c.event.projectId}`,
+      detail: `${c.event.title} · ${fmtDate(c.event.startsAt, input.tz)}`, href: `/events/${c.event.projectId}`,
     })
   }
 
@@ -55,7 +55,7 @@ export function buildActionItems(input: ActionInput): ActionItem[] {
       items.push({
         id: `unpaid:${p.id}`, kind: 'unpaid', severity: overdue ? 'high' : 'low',
         title: `${formatMoney(f.balance, input.currency)} outstanding · ${p.name}`,
-        detail: overdue ? `Payment was due ${fmtDateOnly(f.payment_due_date)}` : 'Partially paid or unpaid', href: `/projects/${p.id}`,
+        detail: overdue ? `Payment was due ${fmtDateOnly(f.payment_due_date)}` : 'Partially paid or unpaid', href: `/events/${p.id}`,
       })
     }
   }
@@ -63,10 +63,10 @@ export function buildActionItems(input: ActionInput): ActionItem[] {
   for (const p of confirmedProjects) {
     if (p.production_stage === 'delivered') continue
     if (p.editing_due_date && p.editing_due_date < today && !p.editing_completed_at) {
-      items.push({ id: `edit:${p.id}`, kind: 'overdue_editing', severity: 'high', title: `Editing overdue · ${p.name}`, detail: `Was due ${fmtDateOnly(p.editing_due_date)}`, href: `/projects/${p.id}` })
+      items.push({ id: `edit:${p.id}`, kind: 'overdue_editing', severity: 'high', title: `Editing overdue · ${p.name}`, detail: `Was due ${fmtDateOnly(p.editing_due_date)}`, href: `/events/${p.id}` })
     }
     if (p.delivery_due_date && p.delivery_due_date < today) {
-      items.push({ id: `deliv:${p.id}`, kind: 'overdue_delivery', severity: 'high', title: `Delivery overdue · ${p.name}`, detail: `Was due ${fmtDateOnly(p.delivery_due_date)}`, href: `/projects/${p.id}` })
+      items.push({ id: `deliv:${p.id}`, kind: 'overdue_delivery', severity: 'high', title: `Delivery overdue · ${p.name}`, detail: `Was due ${fmtDateOnly(p.delivery_due_date)}`, href: `/events/${p.id}` })
     }
   }
 
@@ -74,7 +74,7 @@ export function buildActionItems(input: ActionInput): ActionItem[] {
     if (e.bookingStatus !== 'confirmed') continue
     const missing = [!e.venueName?.trim() && 'venue name', !e.venueAddress?.trim() && 'address'].filter(Boolean)
     if (missing.length) {
-      items.push({ id: `details:${e.id}`, kind: 'missing_details', severity: 'low', title: `Missing ${missing.join(' and ')} · ${e.projectName}`, detail: `${e.title} · ${fmtDate(e.startsAt, input.tz)}`, href: `/projects/${e.projectId}` })
+      items.push({ id: `details:${e.id}`, kind: 'missing_details', severity: 'low', title: `Missing ${missing.join(' and ')} · ${e.projectName}`, detail: `${e.title} · ${fmtDate(e.startsAt, input.tz)}`, href: `/events/${e.projectId}` })
     }
   }
 
@@ -84,7 +84,7 @@ export function buildActionItems(input: ActionInput): ActionItem[] {
     items.push({
       id: `conflict:${i}:${c.kind}`, kind: c.kind === 'employee' ? 'team_conflict' : 'equipment_conflict', severity: 'medium',
       title: c.kind === 'employee' ? `${c.employeeName} is double-booked` : c.kind === 'equipment' ? `${c.equipmentName} is over-committed` : 'Equipment problem',
-      detail: describeConflict(c), href: `/projects/${first.projectId}`,
+      detail: describeConflict(c), href: `/events/${first.projectId}`,
     })
   })
 

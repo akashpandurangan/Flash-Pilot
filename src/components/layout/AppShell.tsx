@@ -26,7 +26,7 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
 }
 
 const TITLES: [prefix: string, title: string][] = [
-  ['/projects', 'Projects'], ['/calendar', 'Calendar'], ['/clients', 'Clients'], ['/team', 'Team'], ['/equipment', 'Equipment'],
+  ['/events', 'Events'], ['/calendar', 'Calendar'], ['/clients', 'Clients'], ['/team', 'Team'], ['/equipment', 'Equipment'],
   ['/payments', 'Payments'], ['/notifications', 'Notifications'], ['/reports', 'Reports'], ['/settings', 'Studio settings'], ['/account', 'Account'],
 ]
 

@@ -58,14 +58,14 @@ export function GlobalSearch() {
         <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/40 [animation:fp-fade-in_.15s_ease-out]" />
         <RadixDialog.Content className="fixed left-1/2 top-[8dvh] z-50 w-[calc(100%-1.5rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-lg border border-line bg-canvas shadow-pop [animation:fp-pop-in_.15s_ease-out]">
           <RadixDialog.Title className="sr-only">Search</RadixDialog.Title>
-          <RadixDialog.Description className="sr-only">Search projects, clients and team members</RadixDialog.Description>
+          <RadixDialog.Description className="sr-only">Search events, clients and team members</RadixDialog.Description>
           <div className="flex items-center gap-2 border-b border-line px-3">
             <Search className="size-4 text-ink-muted" aria-hidden />
             <input
               autoFocus
               value={term}
               onChange={(e) => setTerm(e.target.value)}
-              placeholder="Search projects, clients, team…"
+              placeholder="Search events, clients, team…"
               aria-label="Search"
               className="h-12 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-muted"
             />
@@ -76,9 +76,9 @@ export function GlobalSearch() {
             {results.isError && <p role="alert" className="px-3 py-6 text-center text-sm text-danger">Search failed. Try again.</p>}
             {empty && <p className="px-3 py-6 text-center text-sm text-ink-muted">No matches for “{debounced}”.</p>}
             {r && r.projects.length > 0 && (
-              <Group label="Projects">
+              <Group label="Events">
                 {r.projects.map((p) => (
-                  <Hit key={p.id} to={`/projects/${p.id}`} icon={<FolderKanban />} onClick={close} title={p.name} meta={`${p.project_code} · ${p.client_name}`} right={<BookingBadge status={p.booking_status} />} />
+                  <Hit key={p.id} to={`/events/${p.id}`} icon={<FolderKanban />} onClick={close} title={p.name} meta={`${p.project_code} · ${p.client_name}`} right={<BookingBadge status={p.booking_status} />} />
                 ))}
               </Group>
             )}

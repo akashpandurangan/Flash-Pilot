@@ -66,7 +66,7 @@ export default function ClientDetailPage() {
         actions={
           <>
             {canManage && !c.archived_at && can('projects.manage') && (
-              <Button asChild><Link to={`/projects/new?client=${c.id}`}><Plus className="size-4" /> New project</Link></Button>
+              <Button asChild><Link to={`/events/new?client=${c.id}`}><Plus className="size-4" /> New event</Link></Button>
             )}
             {canManage && <Button variant="secondary" onClick={() => setEditing(true)}><Pencil className="size-4" /> Edit</Button>}
             {canManage && (
@@ -76,7 +76,7 @@ export default function ClientDetailPage() {
                 <ConfirmDialog
                   trigger={<Button variant="secondary"><Archive className="size-4" /> Archive</Button>}
                   title={`Archive ${c.full_name}?`}
-                  description="They'll be hidden from the active client list and can't be picked for new projects. Their existing projects, payments and history are all kept, and you can restore them any time."
+                  description="They'll be hidden from the active client list and can't be picked for new events. Their existing events, payments and history are all kept, and you can restore them any time."
                   confirmLabel="Archive client"
                   tone="primary"
                   onConfirm={() => archive.mutateAsync(true)}
@@ -87,7 +87,7 @@ export default function ClientDetailPage() {
         }
       />
 
-      {c.archived_at && <Notice tone="warning" className="mb-4">This client is archived. Restore them to create new projects.</Notice>}
+      {c.archived_at && <Notice tone="warning" className="mb-4">This client is archived. Restore them to create new events.</Notice>}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel title="Contact" className="min-w-0 lg:col-span-1">
@@ -103,7 +103,7 @@ export default function ClientDetailPage() {
         <div className="min-w-0 space-y-4 lg:col-span-2">
           {can('finance.view') && (
             <div className="grid gap-3 sm:grid-cols-3">
-              <StatCard label="Total project value" value={totals ? formatMoney(totals.value, currency) : '—'} />
+              <StatCard label="Total event value" value={totals ? formatMoney(totals.value, currency) : '—'} />
               <StatCard label="Amount received" value={totals ? formatMoney(totals.received, currency) : '—'} />
               <StatCard label="Outstanding" value={totals ? formatMoney(totals.outstanding, currency) : '—'} hint={totals && totals.outstanding > 0 ? 'Still to collect' : undefined} />
             </div>
@@ -113,13 +113,13 @@ export default function ClientDetailPage() {
           {projects.data && projects.data.length === 0 && (
             <EmptyState
               icon={<FolderKanban />}
-              title="No projects yet"
-              description="Create a project to record their events, team and payments."
-              action={canManage && !c.archived_at && can('projects.manage') && <Button asChild><Link to={`/projects/new?client=${c.id}`}><Plus className="size-4" /> New project</Link></Button>}
+              title="No events yet"
+              description="Create an event to record their sessions, team and payments."
+              action={canManage && !c.archived_at && can('projects.manage') && <Button asChild><Link to={`/events/new?client=${c.id}`}><Plus className="size-4" /> New event</Link></Button>}
             />
           )}
-          {upcoming.length > 0 && <ProjectGroup title="Upcoming events" projects={upcoming} tz={tz} />}
-          {past.length > 0 && <ProjectGroup title="Past & other projects" projects={past} tz={tz} />}
+          {upcoming.length > 0 && <ProjectGroup title="Upcoming sessions" projects={upcoming} tz={tz} />}
+          {past.length > 0 && <ProjectGroup title="Past & other events" projects={past} tz={tz} />}
         </div>
       </div>
 
@@ -134,7 +134,7 @@ function ProjectGroup({ title, projects, tz }: { title: string; projects: Projec
       <ul className="divide-y divide-line">
         {projects.map((p) => (
           <li key={p.id}>
-            <Link to={`/projects/${p.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-sidebar">
+            <Link to={`/events/${p.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-sidebar">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{p.name}</p>
                 <p className="text-xs text-ink-muted">

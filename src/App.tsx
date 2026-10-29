@@ -4,6 +4,7 @@ import { Link, Navigate, Route, Routes, useLocation } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
 import { ConfigMissing } from '@/components/layout/ConfigMissing'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { LegacyProjectsRedirect } from '@/components/LegacyProjectsRedirect'
 import { Button } from '@/components/ui/button'
 import { EmptyState, Spinner } from '@/components/ui/display'
 import { isSupabaseConfigured } from '@/lib/env'
@@ -66,16 +67,18 @@ export default function App() {
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/projects" element={<LegacyProjectsRedirect />} />
+          <Route path="/projects/*" element={<LegacyProjectsRedirect />} />
 
           <Route element={<RequireAuth />}>
             <Route path="/onboarding" element={<OnboardingPage />} />
             <Route element={<StudioGate />}>
               <Route element={<AppShell />}>
                 <Route index element={<RoutedBoundary><Suspense fallback={<PageFallback />}><DashboardPage /></Suspense></RoutedBoundary>} />
-                <Route path="/projects" element={<RoutedBoundary><Suspense fallback={<PageFallback />}><ProjectsPage /></Suspense></RoutedBoundary>} />
-                <Route path="/projects/new" element={<RoutedBoundary><Suspense fallback={<PageFallback />}><Guard permission="projects.manage"><ProjectFormPage /></Guard></Suspense></RoutedBoundary>} />
-                <Route path="/projects/:id" element={<RoutedBoundary><Suspense fallback={<PageFallback />}><ProjectDetailPage /></Suspense></RoutedBoundary>} />
-                <Route path="/projects/:id/edit" element={<RoutedBoundary><Suspense fallback={<PageFallback />}><Guard permission="projects.manage"><ProjectFormPage /></Guard></Suspense></RoutedBoundary>} />
+                <Route path="/events" element={<RoutedBoundary><Suspense fallback={<PageFallback />}><ProjectsPage /></Suspense></RoutedBoundary>} />
+                <Route path="/events/new" element={<RoutedBoundary><Suspense fallback={<PageFallback />}><Guard permission="projects.manage"><ProjectFormPage /></Guard></Suspense></RoutedBoundary>} />
+                <Route path="/events/:id" element={<RoutedBoundary><Suspense fallback={<PageFallback />}><ProjectDetailPage /></Suspense></RoutedBoundary>} />
+                <Route path="/events/:id/edit" element={<RoutedBoundary><Suspense fallback={<PageFallback />}><Guard permission="projects.manage"><ProjectFormPage /></Guard></Suspense></RoutedBoundary>} />
                 <Route path="/calendar" element={<RoutedBoundary><Suspense fallback={<PageFallback />}><CalendarPage /></Suspense></RoutedBoundary>} />
                 <Route path="/clients" element={<RoutedBoundary><Suspense fallback={<PageFallback />}><Guard permission="clients.view"><ClientsPage /></Guard></Suspense></RoutedBoundary>} />
                 <Route path="/clients/:id" element={<RoutedBoundary><Suspense fallback={<PageFallback />}><Guard permission="clients.view"><ClientDetailPage /></Guard></Suspense></RoutedBoundary>} />

@@ -35,7 +35,7 @@ export const ACCESS_ROLE_LABELS: Labels<AccessRole> = {
 export const ACCESS_ROLE_DESCRIPTIONS: Labels<AccessRole> = {
   owner: 'Full access to the studio, team, payments and settings.',
   manager: 'Runs bookings, scheduling and workflow. Financial access is a separate permission.',
-  photographer: 'Sees only the events they are assigned to. No clients or payments.',
+  photographer: 'Sees only the sessions they are assigned to. No clients or payments.',
   editor: 'Sees only their editing jobs and delivery details. No payments.',
 }
 
@@ -70,8 +70,8 @@ export const DELIVERY_METHOD_LABELS: Labels<DeliveryMethod> = {
 }
 
 export const NOTIFICATION_TYPE_LABELS: Labels<NotificationType> = {
-  event_reminder: 'Event reminder', new_assignment: 'New assignment', assignment_changed: 'Assignment changed',
-  event_rescheduled: 'Event updated', event_cancelled: 'Event cancelled', production_deadline: 'Deadline approaching',
+  event_reminder: 'Session reminder', new_assignment: 'New assignment', assignment_changed: 'Assignment changed',
+  event_rescheduled: 'Session updated', event_cancelled: 'Session cancelled', production_deadline: 'Deadline approaching',
   editing_overdue: 'Editing overdue', delivery_overdue: 'Delivery overdue', payment_due: 'Payment due',
 }
 

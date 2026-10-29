@@ -119,7 +119,7 @@ describe('action required', () => {
     expect(kinds).toEqual(expect.arrayContaining(['unstaffed', 'unpaid', 'overdue_editing', 'overdue_delivery', 'missing_details']))
     expect(items.find((i) => i.kind === 'unpaid')?.severity).toBe('high') // past its due date
     expect(items.find((i) => i.kind === 'unpaid')?.title).toContain('₹5,000')
-    expect(items.find((i) => i.kind === 'overdue_editing')?.href).toBe('/projects/p-b')
+    expect(items.find((i) => i.kind === 'overdue_editing')?.href).toBe('/events/p-b')
     const order = items.map((i) => i.severity)
     expect(order).toEqual([...order].sort((x, y) => ({ high: 0, medium: 1, low: 2 }[x] - { high: 0, medium: 1, low: 2 }[y])))
   })

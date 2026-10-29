@@ -99,7 +99,7 @@ export default function EquipmentPage() {
       />
 
       {conflicts.length > 0 && (
-        <Notice tone="warning" title={`${conflicts.length} equipment ${conflicts.length === 1 ? 'issue' : 'issues'} on upcoming events`} className="mb-4">
+        <Notice tone="warning" title={`${conflicts.length} equipment ${conflicts.length === 1 ? 'issue' : 'issues'} on upcoming sessions`} className="mb-4">
           <ul className="mt-1 list-disc space-y-0.5 pl-4">{conflicts.slice(0, 5).map((c, i) => <li key={i}>{describeConflict(c)}</li>)}</ul>
           {conflicts.length > 5 && <p className="mt-1">…and {conflicts.length - 5} more. See the Reservations tab.</p>}
         </Notice>
@@ -128,7 +128,7 @@ export default function EquipmentPage() {
             skeleton={<ListSkeleton />}
             empty={
               (inventory.data?.length ?? 0) === 0 ? (
-                <EmptyState icon={<Camera />} title="Add your gear" description="Track cameras, lenses and lighting, then reserve them for events and catch double-bookings early." action={canManage && <Button onClick={() => setEditing('new')}><Plus className="size-4" /> Add equipment</Button>} />
+                <EmptyState icon={<Camera />} title="Add your gear" description="Track cameras, lenses and lighting, then reserve them for sessions and catch double-bookings early." action={canManage && <Button onClick={() => setEditing('new')}><Plus className="size-4" /> Add equipment</Button>} />
               ) : (
                 <EmptyState icon={<Package />} title="Nothing matches" description="Try a different search or filter." />
               )
@@ -177,7 +177,7 @@ export default function EquipmentPage() {
             query={schedule}
             isEmpty={reservations.length === 0}
             skeleton={<ListSkeleton />}
-            empty={<EmptyState icon={<Package />} title="No upcoming reservations" description="Reserve equipment when you create or edit a project's events. Cancelled events release their gear automatically." />}
+            empty={<EmptyState icon={<Package />} title="No upcoming reservations" description="Reserve equipment when you create or edit an event's sessions. Cancelled sessions release their gear automatically." />}
           >
             <ul className="divide-y divide-line rounded-lg border border-line">
               {reservations.map((r) => {
@@ -186,7 +186,7 @@ export default function EquipmentPage() {
                   <li key={r.key} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium">{r.name}{r.qty > 1 && <span className="text-ink-muted"> × {r.qty}</span>}{r.custom && <Badge tone="outline" className="ml-2">Not in inventory</Badge>}</p>
-                      <p className="text-xs text-ink-muted"><Link to={`/projects/${r.event.projectId}`} className="hover:underline">{r.event.projectName}</Link> · {r.event.title} · {fmtDate(r.event.startsAt, tz)}, {fmtTimeRange(r.event.startsAt, r.event.endsAt, tz)}</p>
+                      <p className="text-xs text-ink-muted"><Link to={`/events/${r.event.projectId}`} className="hover:underline">{r.event.projectName}</Link> · {r.event.title} · {fmtDate(r.event.startsAt, tz)}, {fmtTimeRange(r.event.startsAt, r.event.endsAt, tz)}</p>
                     </div>
                     <BookingBadge status={r.event.bookingStatus} />
                     {issue && <Badge tone="warning"><AlertTriangle className="size-3" /> Conflict</Badge>}

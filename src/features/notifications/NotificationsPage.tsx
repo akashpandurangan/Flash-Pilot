@@ -35,7 +35,7 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <PageHeader title="Notifications" description="Reminders, assignments and deadlines. Reminders for confirmed events go out about a day before the reporting time." />
+      <PageHeader title="Notifications" description="Reminders, assignments and deadlines. Reminders for confirmed sessions go out about a day before the reporting time." />
       <Tabs value={f.tab} onValueChange={(tab) => setF({ tab })}>
         <TabsList>
           <TabsTrigger value="inbox">Inbox{unread > 0 && <Badge tone="solid">{unread}</Badge>}</TabsTrigger>
@@ -109,9 +109,9 @@ function Preferences() {
         </Panel>
         <Panel title="What to notify me about">
           <div className="space-y-4">
-            <Switch label="Event reminders" description="About 24 hours before a shoot you're assigned to." checked={draft.cat_reminders} onCheckedChange={set('cat_reminders')} />
+            <Switch label="Session reminders" description="About 24 hours before a shoot you're assigned to." checked={draft.cat_reminders} onCheckedChange={set('cat_reminders')} />
             <Switch label="Assignments" description="When you're assigned, or your role changes." checked={draft.cat_assignments} onCheckedChange={set('cat_assignments')} />
-            <Switch label="Schedule changes" description="When an event you're on is rescheduled or cancelled." checked={draft.cat_schedule} onCheckedChange={set('cat_schedule')} />
+            <Switch label="Schedule changes" description="When a session you're on is rescheduled or cancelled." checked={draft.cat_schedule} onCheckedChange={set('cat_schedule')} />
             <Switch label="Production deadlines" description="Editing and delivery due dates and overdue work." checked={draft.cat_production} onCheckedChange={set('cat_production')} />
             {can('finance.view') && <Switch label="Payments" description="Payments that are due or overdue." checked={draft.cat_payments} onCheckedChange={set('cat_payments')} />}
           </div>
@@ -133,7 +133,7 @@ function DeliveryLog() {
     <div className="space-y-4">
       {notSent > 0 && (
         <Notice tone="warning" title="Some emails were not sent" action={<Button variant="secondary" size="sm" asChild><Link to="/settings">Settings</Link></Button>}>
-          {notSent} email{notSent === 1 ? ' was' : 's were'} not sent because no email provider is configured for this project. In-app notifications still work. See <code>docs/SETUP.md</code> to enable email.
+          {notSent} email{notSent === 1 ? ' was' : 's were'} not sent because no email provider is configured yet. In-app notifications still work. See <code>docs/SETUP.md</code> to enable email.
         </Notice>
       )}
       {failed > 0 && <Notice tone="danger" title={`${failed} email${failed === 1 ? '' : 's'} failed`}>The error for each attempt is shown below and kept in the delivery history.</Notice>}

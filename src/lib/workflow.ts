@@ -38,7 +38,7 @@ export const WORKFLOW_LABELS: Record<WorkflowAction, { label: string; done: stri
   start_editing: { label: 'Move to editing', done: 'Moved into editing' },
   complete_editing: { label: 'Mark editing completed', done: 'Editing marked completed' },
   mark_ready: { label: 'Mark ready for delivery', done: 'Marked ready for delivery' },
-  mark_delivered: { label: 'Mark delivered', done: 'Project delivered' },
+  mark_delivered: { label: 'Mark delivered', done: 'Event delivered' },
   revert: { label: 'Step back one stage', done: 'Stage reverted' },
 }
 
@@ -56,7 +56,7 @@ export type WorkflowCheck = { ok: true } | { ok: false; reason: string }
 
 export function checkWorkflowAction(subject: WorkflowSubject, role: AccessRole, action: WorkflowAction): WorkflowCheck {
   if (!ROLES_FOR[action].includes(role)) return { ok: false, reason: 'Your role cannot perform this step.' }
-  if (subject.archived_at) return { ok: false, reason: 'This project is archived.' }
+  if (subject.archived_at) return { ok: false, reason: 'This event is archived.' }
   if (subject.booking_status !== 'confirmed') return { ok: false, reason: 'Confirm the booking before changing production.' }
 
   const s = subject.production_stage
@@ -76,7 +76,7 @@ export function checkWorkflowAction(subject: WorkflowSubject, role: AccessRole, 
       if (s !== 'editing') return { ok: false, reason: 'Editing is not in progress.' }
       return subject.editing_completed_at ? { ok: true } : { ok: false, reason: 'Finish editing first.' }
     case 'mark_delivered':
-      if (s !== 'ready_for_delivery') return { ok: false, reason: 'The project is not ready for delivery.' }
+      if (s !== 'ready_for_delivery') return { ok: false, reason: 'The event is not ready for delivery.' }
       return subject.hasDeliveryDetails ? { ok: true } : { ok: false, reason: 'Record the delivery method and date first.' }
     case 'revert':
       return s === 'upcoming' ? { ok: false, reason: 'Nothing to step back from.' } : { ok: true }

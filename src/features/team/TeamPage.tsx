@@ -111,7 +111,7 @@ export default function TeamPage() {
         skeleton={<ListSkeleton />}
         empty={
           (team.data?.length ?? 0) <= 1 && !f.q ? (
-            <EmptyState icon={<UsersRound />} title="Build your team" description="Add the people you assign to events. They don't need an account to be scheduled." action={canManage && <Button onClick={() => setEditing('new')}><Plus className="size-4" /> Add team member</Button>} />
+            <EmptyState icon={<UsersRound />} title="Build your team" description="Add the people you assign to sessions. They don't need an account to be scheduled." action={canManage && <Button onClick={() => setEditing('new')}><Plus className="size-4" /> Add team member</Button>} />
           ) : (
             <EmptyState icon={<UsersRound />} title="No one matches" description="Try a different search or filter." action={<Button variant="secondary" onClick={() => setF({ q: '', role: '', status: 'active' })}>Clear filters</Button>} />
           )
@@ -195,8 +195,8 @@ function RowMenu({ e, isOwner, onEdit, onAccess, onToggle }: { e: Employee; isOw
         title={e.is_active ? `Deactivate ${e.full_name}?` : `Reactivate ${e.full_name}?`}
         description={
           e.is_active
-            ? 'They can no longer sign in or be assigned to new work, and their upcoming event reminders are withdrawn. Their past assignments and history stay on every project.'
-            : 'They can be assigned to events again. If they have sign-in access they can use it immediately.'
+            ? 'They can no longer sign in or be assigned to new work, and their upcoming session reminders are withdrawn. Their past assignments and history stay on every event.'
+            : 'They can be assigned to sessions again. If they have sign-in access they can use it immediately.'
         }
         confirmLabel={e.is_active ? 'Deactivate' : 'Reactivate'}
         tone={e.is_active ? 'danger' : 'primary'}
@@ -348,7 +348,7 @@ function AccessDialog({ employee, onClose }: { employee: Employee | null; onClos
             </Field>
             <p className="-mt-2 text-[13px] text-ink-muted">{ACCESS_ROLE_DESCRIPTIONS[accessRole]}</p>
             {accessRole === 'manager' && (
-              <Checkbox label="Can view and record payments" description="Off by default. Grants access to project amounts, payments and financial reports." checked={finance} onChange={(e) => setFinance(e.target.checked)} />
+              <Checkbox label="Can view and record payments" description="Off by default. Grants access to event amounts, payments and financial reports." checked={finance} onChange={(e) => setFinance(e.target.checked)} />
             )}
           </div>
         </DialogContent>

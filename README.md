@@ -5,8 +5,9 @@ delivery - in one place. A black-and-white, no-nonsense workspace backed by your
 
 **What it does**
 
-- **Projects & events** - multi-day bookings (engagement → wedding → reception), each with its own time, venue,
-  team and equipment; booking status (inquiry / confirmed / cancelled) kept separate from production stage.
+- **Events & sessions** - an event is one booking (say, a wedding) made of dated sessions (sangeet, ceremony,
+  reception), each with its own time, venue, team and equipment; booking status (inquiry / confirmed /
+  cancelled) is kept separate from production stage.
 - **Production workflow** - upcoming → production → editing → ready → delivered, with a role-aware checklist,
   editor assignment, deadlines and delivery details.
 - **Money, done safely** - you enter the amount (no packages); advances and installments are recorded payments;
@@ -14,11 +15,11 @@ delivery - in one place. A black-and-white, no-nonsense workspace backed by your
 - **Team & permissions** - owner, manager, photographer, editor. Crew see only what they're assigned to and never
   see money. Enforced by the database, not just the UI. Employees are invited securely - no shared passwords.
 - **Calendar & conflicts** - month/week/day/agenda views, warnings for double-booked people, over-committed gear
-  and unstaffed events.
-- **Reminders** - server-side, duplicate-safe reminders ~24 h before confirmed events; reschedules and
+  and unstaffed sessions.
+- **Reminders** - server-side, duplicate-safe reminders ~24 h before confirmed sessions; reschedules and
   cancellations withdraw stale ones; in-app now, e-mail when you add a provider key.
 - **Live updates** - Supabase Realtime keeps open screens current.
-- **Reports** - bookings, stages, upcoming events, workload, outstanding & received payments, pending/overdue
+- **Reports** - bookings, stages, upcoming sessions, workload, outstanding & received payments, pending/overdue
   delivery, all exportable to CSV.
 
 ## Quick start

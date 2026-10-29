@@ -31,12 +31,12 @@ export function reminderDueAt(input: ReminderInput, now: Date = new Date(), lead
 
 export function reminderExplanation(input: ReminderInput, now: Date = new Date(), leadHours = DEFAULT_REMINDER_LEAD_HOURS): string {
   if (input.bookingStatus === 'inquiry') return 'No reminders are sent for inquiries. Confirm the booking to schedule them.'
-  if (input.bookingStatus === 'cancelled' || input.eventCancelled) return 'This event is cancelled - no reminders will be sent.'
-  if (input.archived) return 'This project is archived - no reminders will be sent.'
+  if (input.bookingStatus === 'cancelled' || input.eventCancelled) return 'This session is cancelled - no reminders will be sent.'
+  if (input.archived) return 'This event is archived - no reminders will be sent.'
   const due = reminderDueAt(input, now, leadHours)
-  if (!due) return 'This event has already started.'
+  if (!due) return 'This session has already started.'
   return due.getTime() <= now.getTime() + 60_000
-    ? 'The event is inside the reminder window, so reminders go out within a few minutes.'
+    ? 'The session is inside the reminder window, so reminders go out within a few minutes.'
     : `Assigned team members are reminded ${leadHours} hours before the reporting time.`
 }
 

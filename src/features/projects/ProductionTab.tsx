@@ -81,7 +81,7 @@ export function ProductionTab({ project, balance }: { project: ProjectDetail; ba
                   <ConfirmDialog
                     tone="primary"
                     title="Deliver with an outstanding balance?"
-                    description={`${formatMoney(balance, currency)} is still unpaid on this project. You can deliver anyway - the balance stays on record and keeps appearing in Payments.`}
+                    description={`${formatMoney(balance, currency)} is still unpaid on this event. You can deliver anyway - the balance stays on record and keeps appearing in Payments.`}
                     confirmLabel="Mark delivered anyway"
                     onConfirm={() => run.mutateAsync('mark_delivered')}
                     trigger={<Button size="lg" className="w-full sm:w-auto" disabled={!check?.ok}>{WORKFLOW_LABELS.mark_delivered.label}</Button>}
@@ -91,7 +91,7 @@ export function ProductionTab({ project, balance }: { project: ProjectDetail; ba
                   <ConfirmDialog
                     tone="primary"
                     title="Step back one stage?"
-                    description="The latest milestone is cleared and the project returns to the previous stage. The history stays in the activity log."
+                    description="The latest milestone is cleared and the event returns to the previous stage. The history stays in the activity log."
                     confirmLabel="Step back"
                     onConfirm={() => run.mutateAsync('revert')}
                     trigger={<Button variant="ghost"><Undo2 className="size-4" /> Step back</Button>}
@@ -106,7 +106,7 @@ export function ProductionTab({ project, balance }: { project: ProjectDetail; ba
               <ConfirmDialog
                 tone="primary"
                 title="Reopen this delivery?"
-                description="The project returns to “Ready for delivery” and the delivery confirmation is cleared."
+                description="The event returns to “Ready for delivery” and the delivery confirmation is cleared."
                 confirmLabel="Reopen"
                 onConfirm={() => run.mutateAsync('revert')}
                 trigger={<Button variant="secondary" size="sm"><Undo2 className="size-3.5" /> Reopen</Button>}
@@ -158,7 +158,7 @@ export function ProductionTab({ project, balance }: { project: ProjectDetail; ba
               <Detail label="Confirmation">{delivery.data.confirmed_at ? <Badge tone="success">Delivered {fmtDateTime(delivery.data.confirmed_at, tz)}</Badge> : <Badge tone="outline">Not yet confirmed</Badge>}</Detail>
             </dl>
           ) : (
-            <p className="text-[13px] text-ink-muted">No delivery recorded yet. Capture the method, date and gallery link before marking the project delivered.</p>
+            <p className="text-[13px] text-ink-muted">No delivery recorded yet. Capture the method, date and gallery link before marking the event delivered.</p>
           )}
         </Panel>
       </div>
@@ -212,12 +212,12 @@ function Checklist({ project }: { project: ProjectDetail }) {
   return (
     <Panel
       title="Production checklist"
-      description={total > 0 ? `${done} of ${total} done · ticking items never changes the project stage` : undefined}
+      description={total > 0 ? `${done} of ${total} done · ticking items never changes the event stage` : undefined}
       bodyClassName="p-0"
     >
       {tasks.isLoading && <div className="space-y-2 p-4"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>}
       {tasks.isError && <div className="p-4"><ErrorState error={tasks.error} onRetry={() => void tasks.refetch()} /></div>}
-      {tasks.data && total === 0 && <div className="p-4"><EmptyState title="No tasks" description={canManage ? 'Add the steps this project needs.' : 'Nothing has been added yet.'} /></div>}
+      {tasks.data && total === 0 && <div className="p-4"><EmptyState title="No tasks" description={canManage ? 'Add the steps this event needs.' : 'Nothing has been added yet.'} /></div>}
       {tasks.data && total > 0 && (
         <>
           <div className="h-1 bg-subtle" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} aria-label="Checklist progress"><div className="h-full bg-ink transition-[width]" style={{ width: `${(done / total) * 100}%` }} /></div>

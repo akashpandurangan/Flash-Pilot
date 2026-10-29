@@ -34,7 +34,7 @@ export function ActivityTimeline({ query, showProject = false, empty = 'Nothing 
             <p>{activitySummary(a, currency)}</p>
             <p className="mt-0.5 text-xs text-ink-muted">
               {a.actor_name ?? 'System'} · {fmtDateTime(a.created_at, tz)}
-              {showProject && a.project_id && a.project?.name && <> · <Link to={`/projects/${a.project_id}`} className="underline underline-offset-2">{a.project.name}</Link></>}
+              {showProject && a.project_id && a.project?.name && <> · <Link to={`/events/${a.project_id}`} className="underline underline-offset-2">{a.project.name}</Link></>}
             </p>
           </div>
         </li>
