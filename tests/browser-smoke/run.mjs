@@ -1,0 +1,319 @@
+// Browser smoke test: drives the real UI in a real browser against a *fake* Supabase
+// (network responses are intercepted - see fake-backend.mjs). It proves routing, role gating,
+// forms, layout at three widths and a clean console. It does NOT test the real database or
+// Supabase Auth/Realtime; those are covered by tests/db and by docs/SETUP.md's live checklist.
+//
+//   npm run test:browser
+//
+// Needs a Chromium-based browser: Edge or Chrome is used from the system (no download).
+//   BROWSER_CHANNEL=msedge|chrome   (default: msedge on Windows, chrome elsewhere)
+//   BROWSER_PATH=/path/to/browser    (overrides the channel)
+import { spawn } from 'node:child_process'
+import { mkdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { chromium } from 'playwright-core'
+import { ids, installFakeSupabase } from './fake-backend.mjs'
+
+const PORT = 5199
+const BASE = `http://localhost:${PORT}`
+const OUT = fileURLToPath(new URL('./.screenshots/', import.meta.url))
+mkdirSync(OUT, { recursive: true })
+
+// Start Vite pointed at a fake Supabase URL so the app believes it is configured.
+const server = spawn(`npx vite --port ${PORT} --strictPort`, {
+  shell: true,
+  stdio: 'ignore',
+  env: { ...process.env, VITE_CONFIG_NATIVE_IGNORE_WARNING: 'true', VITE_SUPABASE_URL: 'http://127.0.0.1:54321', VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fake_for_smoke_test' },
+})
+const stopServer = () => { try { server.kill() } catch { /* already gone */ } }
+process.on('exit', stopServer)
+for (let i = 0; i < 60; i++) {
+  try { if ((await fetch(BASE)).ok) break } catch { /* not up yet */ }
+  await new Promise((r) => setTimeout(r, 500))
+}
+
+const launchOptions = process.env.BROWSER_PATH
+  ? { executablePath: process.env.BROWSER_PATH, headless: true }
+  : { channel: process.env.BROWSER_CHANNEL ?? (process.platform === 'win32' ? 'msedge' : 'chrome'), headless: true }
+const browser = await chromium.launch(launchOptions)
+
+const results = []
+const problems = []
+const NOISE = [/WebSocket/i, /ERR_CONNECTION_REFUSED/i, /realtime/i, /favicon/i, /net::ERR_FAILED/i, /Download the React DevTools/i]
+
+function watch(page, label) {
+  page.on('console', (m) => {
+    if (!['error', 'warning'].includes(m.type())) return
+    const text = m.text()
+    if (NOISE.some((r) => r.test(text))) return
+    problems.push(`[${label}] console.${m.type()}: ${text.slice(0, 400)}`)
+  })
+  page.on('pageerror', (e) => problems.push(`[${label}] PAGE ERROR: ${e.message.slice(0, 400)}`))
+}
+
+const check = (name, ok, detail = '') => { results.push({ name, ok: !!ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` - ${detail}` : ''}`) }
+
+async function newSession(role, viewport) {
+  const context = await browser.newContext({ viewport, deviceScaleFactor: 1, timezoneId: 'America/New_York' }) // browser tz deliberately != studio tz
+  const api = []
+  await installFakeSupabase(context, role, api)
+  const page = await context.newPage()
+  watch(page, `${role}@${viewport.width}`)
+  return { context, page, api }
+}
+
+async function login(page) {
+  await page.goto(`${BASE}/login`)
+  await page.getByLabel('Email').fill('owner@lumen.studio')
+  await page.getByLabel('Password').fill('Password123')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 15000 })
+}
+
+const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPage: false })
+
+/* ---------------------------------------------------------------- owner / desktop */
+{
+  const { page } = await newSession('owner', { width: 1366, height: 860 })
+
+  // login validation
+  await page.goto(`${BASE}/login`)
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  check('login shows validation errors', (await page.getByText('Enter a valid email address').count()) > 0 && (await page.getByText('Enter your password').count()) > 0)
+  await shot(page, '01-login')
+
+  // protected route redirects to login
+  await page.goto(`${BASE}/projects`)
+  await page.waitForURL(/\/login/)
+  check('anonymous visit to /projects redirects to /login', true)
+
+  await login(page)
+  check('after login the user returns to the page they were heading to', new URL(page.url()).pathname === '/projects')
+  await page.goto(`${BASE}/`)
+  await page.getByRole('heading', { level: 1 }).waitFor()
+  check('dashboard greets the user', /Good (morning|afternoon|evening), Olivia/.test(await page.getByRole('heading', { level: 1 }).innerText()))
+  await page.waitForTimeout(600)
+  check('dashboard shows KPI numbers from the API', (await page.getByText('Active projects').count()) > 0 && (await page.getByText('₹1,50,000').count()) > 0)
+  check('dashboard lists upcoming events', (await page.getByText('Mehta Corporate Launch').count()) > 0)
+  check('dashboard flags the double-booked photographer in Action required', (await page.getByText('Riya Kapoor is double-booked').count()) > 0)
+  check('dashboard flags overdue editing', (await page.getByText(/Editing overdue/).count()) > 0)
+  check('dashboard shows unpaid balance alert', (await page.getByText(/outstanding · Sharma/).count()) > 0)
+  await shot(page, '02-dashboard')
+
+  const owner = [
+    ['/projects', '03-projects', 'Sharma–Rao Wedding'],
+    ['/projects/new', '04-project-new', 'Project details'],
+    [`/projects/${ids.p1}`, '05-project-detail', 'Wedding ceremony'],
+    [`/projects/${ids.p1}/edit`, '06-project-edit', 'Project details'],
+    ['/calendar', '07-calendar-month', 'Scheduling warnings'],
+    ['/clients', '08-clients', 'Anita Sharma'],
+    [`/clients/${ids.c1}`, '09-client-detail', 'Contact'],
+    ['/team', '10-team', 'Riya Kapoor'],
+    ['/equipment', '11-equipment', 'Sony A7 IV'],
+    ['/payments', '12-payments', 'Project balances'],
+    ['/notifications', '13-notifications', 'Reminder: Product launch'],
+    ['/reports', '14-reports', 'Reports'],
+    ['/settings', '15-settings', 'Studio details'],
+    ['/account', '16-account', 'Change password'],
+  ]
+  for (const [path, name, expectText] of owner) {
+    await page.goto(`${BASE}${path}`)
+    let ok = true
+    try { await page.getByText(expectText, { exact: false }).first().waitFor({ timeout: 8000 }) } catch { ok = false }
+    await page.waitForTimeout(250)
+    check(`direct URL ${path} renders after a full page load`, ok, ok ? '' : `missing "${expectText}"`)
+    await shot(page, name)
+  }
+
+  // calendar views
+  for (const v of ['week', 'day', 'list']) {
+    await page.goto(`${BASE}/calendar?view=${v}`)
+    await page.waitForTimeout(500)
+    await shot(page, `07-calendar-${v}`)
+  }
+  await page.goto(`${BASE}/calendar?view=list`)
+  await page.getByText('Mehta Corporate Launch').first().waitFor()
+  check('calendar agenda lists events', true)
+
+  // global search + shortcut
+  await page.goto(`${BASE}/`)
+  await page.getByRole('heading', { level: 1 }).waitFor()
+  await page.waitForTimeout(500)
+  await page.keyboard.press('Control+k')
+  await page.getByPlaceholder('Search projects, clients, team…').fill('sharma')
+  await page.waitForTimeout(700)
+  await shot(page, '17-search')
+  check('Ctrl+K opens global search', (await page.getByPlaceholder('Search projects, clients, team…').count()) === 1)
+  await page.keyboard.press('Escape')
+
+  // notification bell
+  await page.getByRole('button', { name: /Notifications, 1 unread/ }).click()
+  await page.waitForTimeout(300)
+  check('bell shows unread count and the latest items', (await page.getByText('Reminder: Product launch').count()) > 0)
+  await shot(page, '18-bell')
+  await page.keyboard.press('Escape')
+
+  // project form validation
+  await page.goto(`${BASE}/projects/new`)
+  await page.getByRole('button', { name: 'Create project' }).click()
+  await page.waitForTimeout(400)
+  check('empty project form shows inline errors', (await page.getByText('Choose a client').count()) > 0 && (await page.getByText('Give the project a name').count()) > 0 && (await page.getByText('Choose the event date').count()) > 0)
+  await shot(page, '19-project-form-errors')
+
+  // client dialog + duplicate warning
+  await page.goto(`${BASE}/clients`)
+  await page.getByRole('button', { name: 'New client' }).first().click()
+  await page.getByLabel('Full name').fill('Anita S')
+  await page.getByLabel(/^Phone/).fill('+91 99999 11111')
+  await page.waitForTimeout(900)
+  check('new-client dialog warns about a matching phone number', (await page.getByText('This looks like an existing client').count()) > 0)
+  await shot(page, '20-client-dialog')
+  await page.keyboard.press('Escape')
+
+  // project detail tabs
+  await page.goto(`${BASE}/projects/${ids.p1}?tab=production`)
+  await page.getByText('Production checklist').waitFor()
+  await shot(page, '21-project-production')
+  await page.goto(`${BASE}/projects/${ids.p1}?tab=payments`)
+  await page.getByText('Payment history').waitFor()
+  await shot(page, '22-project-payments')
+  await page.getByRole('button', { name: /Record payment/ }).first().click()
+  await page.getByLabel(/Amount received/).fill('200000')
+  await page.waitForTimeout(300)
+  check('payment dialog warns when the amount exceeds the balance', (await page.getByText(/more than the balance/).count()) > 0)
+  await shot(page, '23-payment-overpay')
+  await page.keyboard.press('Escape')
+  await page.goto(`${BASE}/projects/${ids.p1}?tab=activity`)
+  await page.getByText('Moved into editing').waitFor()
+  check('activity timeline shows who/when', (await page.getByText(/Olivia Mehra ·/).count()) > 0)
+
+  // 404
+  await page.goto(`${BASE}/definitely-not-a-page`)
+  await page.waitForTimeout(400)
+  check('unknown URL shows a not-found page inside the app', (await page.getByText('Page not found').count()) > 0)
+  await shot(page, '24-404')
+
+  // sign out
+  await page.goto(`${BASE}/`)
+  await page.getByRole('button', { name: 'Account menu' }).click()
+  await page.getByRole('menuitem', { name: 'Sign out' }).click()
+  await page.waitForURL(/\/login/)
+  check('sign out returns to /login', true)
+}
+
+/* ------------------------------------------------------------------ owner / mobile */
+{
+  const { page } = await newSession('owner', { width: 390, height: 844 })
+  await login(page)
+  await page.getByRole('heading', { level: 1 }).waitFor()
+  await page.waitForTimeout(600)
+  await shot(page, '30-mobile-dashboard')
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
+  check('mobile dashboard has no horizontal page scroll', !overflow)
+  await page.getByRole('button', { name: 'Open menu' }).click()
+  await page.waitForTimeout(300)
+  await shot(page, '31-mobile-nav')
+  check('mobile drawer lists every section for the owner', (await page.getByRole('navigation', { name: 'Main' }).getByRole('link').count()) === 10)
+  await page.keyboard.press('Escape')
+  for (const [path, name] of [['/projects', '32-mobile-projects'], ['/projects/new', '33-mobile-project-form'], [`/projects/${ids.p1}`, '34-mobile-project-detail'], ['/clients', '35-mobile-clients'], ['/calendar', '36-mobile-calendar'], ['/team', '37-mobile-team'], ['/payments', '38-mobile-payments']]) {
+    await page.goto(`${BASE}${path}`)
+    await page.waitForTimeout(700)
+    const o = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
+    check(`mobile ${path} fits the screen width`, !o)
+    await shot(page, name)
+  }
+}
+
+/* ------------------------------------------------------------------ tablet */
+{
+  const { page } = await newSession('owner', { width: 820, height: 1100 })
+  await login(page)
+  await page.waitForTimeout(700)
+  await shot(page, '40-tablet-dashboard')
+  await page.goto(`${BASE}/projects`)
+  await page.waitForTimeout(700)
+  const o = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
+  check('tablet projects list fits the screen width', !o)
+  await shot(page, '41-tablet-projects')
+}
+
+/* ------------------------------------------------------------- photographer role */
+{
+  const { page, api } = await newSession('photographer', { width: 1366, height: 860 })
+  await login(page)
+  await page.getByRole('heading', { level: 1 }).waitFor()
+  await page.waitForTimeout(600)
+  const nav = await page.getByRole('navigation', { name: 'Main' }).getByRole('link').allInnerTexts()
+  check('photographer sees only Overview, Projects, Calendar, Notifications', JSON.stringify(nav.map((s) => s.trim())) === JSON.stringify(['Overview', 'Projects', 'Calendar', 'Notifications']), nav.join(', '))
+  check('photographer dashboard hides money', (await page.getByText('Outstanding').count()) === 0)
+  check('photographer dashboard has no "Action required" panel', (await page.getByText('Action required').count()) === 0)
+  await shot(page, '50-photographer-dashboard')
+  for (const path of ['/payments', '/clients', '/team', '/reports', '/settings', '/equipment', '/projects/new']) {
+    await page.goto(`${BASE}${path}`)
+    await page.waitForTimeout(400)
+    check(`photographer is blocked from ${path}`, (await page.getByText("You don't have access to this page").count()) > 0)
+  }
+  await shot(page, '51-photographer-blocked')
+  await page.goto(`${BASE}/projects/${ids.p1}`)
+  await page.getByText('Wedding ceremony').first().waitFor()
+  const tabs = await page.getByRole('tab').allInnerTexts()
+  check('photographer project page has no Payments tab', !tabs.includes('Payments'), tabs.join(', '))
+  check('photographer cannot edit the project', (await page.getByRole('link', { name: 'Edit' }).count()) === 0)
+  check('photographer never requests money tables', !api.some((l) => /payments|project_financials|project_finance/.test(l)), api.filter((l) => /payments|financ/.test(l)).join(', '))
+  await shot(page, '52-photographer-project')
+}
+
+/* ------------------------------------------------------------- deactivated employee */
+{
+  const { page } = await newSession('inactive', { width: 1100, height: 760 })
+  await login(page)
+  await page.getByText('Your access has been deactivated').waitFor({ timeout: 8000 })
+  check('a deactivated employee is told their access was removed (not sent to onboarding)', true)
+  await shot(page, '60-deactivated')
+}
+
+/* ------------------------------------------------------------------ onboarding wizard */
+{
+  const { page } = await newSession('new', { width: 1100, height: 900 })
+  await login(page)
+  await page.waitForURL(/\/onboarding/)
+  check('a new owner without a studio is sent to onboarding', true)
+  await page.getByRole('button', { name: 'Continue' }).click()
+  check('step 1 validates the studio name', (await page.getByText('Enter your studio name').count()) > 0)
+  await page.getByLabel(/Studio name/).fill('Aperture & Co')
+  await page.getByLabel('City').fill('Pune')
+  await shot(page, '61-onboarding-1')
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await page.getByText('About you').waitFor({ timeout: 8000 })
+  check('step 1 creates the studio and advances to step 2', true)
+  await shot(page, '62-onboarding-2')
+  await page.getByLabel(/Full name/).fill('Olivia Mehra')
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await page.getByText('Add your team').waitFor({ timeout: 8000 })
+  check('step 2 saves owner details and advances to team setup', true)
+  await shot(page, '63-onboarding-3')
+  await page.reload()
+  await page.getByText('Add your team').waitFor({ timeout: 8000 })
+  check('onboarding progress persists across a refresh (resumes at step 3)', true)
+  await page.getByRole('button', { name: /Skip for now|Continue/ }).click()
+  await page.getByText('is ready').waitFor({ timeout: 8000 })
+  await shot(page, '64-onboarding-4')
+  await page.getByRole('button', { name: 'Go to dashboard' }).click()
+  await page.waitForURL(`${BASE}/`, { timeout: 8000 })
+  check('finishing onboarding lands on the dashboard and it is not shown again', true)
+  await page.goto(`${BASE}/onboarding`)
+  await page.waitForURL(`${BASE}/`, { timeout: 8000 })
+  check('revisiting /onboarding after completion redirects away', true)
+}
+
+await browser.close()
+stopServer()
+
+console.log('\n==== SUMMARY ====')
+const failed = results.filter((r) => !r.ok)
+console.log(`${results.length - failed.length}/${results.length} checks passed`)
+failed.forEach((f) => console.log(`  FAILED: ${f.name} ${f.detail}`))
+console.log(`\nConsole problems (${problems.length}):`)
+const uniq = [...new Set(problems)]
+uniq.slice(0, 40).forEach((p) => console.log('  ' + p))
+process.exit(failed.length ? 1 : 0)
