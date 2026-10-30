@@ -14,9 +14,15 @@ export const EVENT_TYPE_LABELS: Labels<EventType> = {
 
 export const BOOKING_STATUS_LABELS: Labels<BookingStatus> = { inquiry: 'Inquiry', confirmed: 'Confirmed', cancelled: 'Cancelled' }
 
-export const PRODUCTION_STAGES: ProductionStage[] = ['upcoming', 'production', 'editing', 'ready_for_delivery', 'delivered']
+/** The production lifecycle, in order. */
+export const PRODUCTION_STAGES: ProductionStage[] = ['upcoming', 'production', 'awaiting_approval', 'editing', 'out_for_delivery', 'delivered']
 export const PRODUCTION_STAGE_LABELS: Labels<ProductionStage> = {
-  upcoming: 'Upcoming', production: 'Production', editing: 'Editing', ready_for_delivery: 'Ready for delivery', delivered: 'Delivered',
+  upcoming: 'Upcoming', production: 'Production', awaiting_approval: 'Waiting for Client Approval', editing: 'Editing',
+  out_for_delivery: 'Out for Delivery', delivered: 'Delivered',
+}
+/** For tight spots (the dashboard pipeline); the full name stays in the tooltip and the accessible label. */
+export const PRODUCTION_STAGE_SHORT_LABELS: Labels<ProductionStage> = {
+  ...PRODUCTION_STAGE_LABELS, awaiting_approval: 'Client approval',
 }
 
 export const ASSIGNMENT_ROLE_LABELS: Labels<AssignmentRole> = {

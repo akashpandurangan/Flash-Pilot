@@ -1,5 +1,5 @@
 import { formatInTimeZone } from 'date-fns-tz'
-import { CalendarClock, ChevronRight, IndianRupee, ListChecks, MapPin, Phone, Users } from 'lucide-react'
+import { CalendarClock, ChevronRight, Hourglass, IndianRupee, ListChecks, MapPin, Phone, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import type { ProjectDetail } from '@/api/projects'
@@ -9,7 +9,7 @@ import { BookingBadge, StageBadge, StageStepper } from '@/components/ui/status'
 import { EVENT_TYPE_LABELS } from '@/lib/constants'
 import { eventProgress } from '@/lib/dashboard'
 import { formatMoney, type FinancialSummary } from '@/lib/money'
-import { fmtTime } from '@/lib/time'
+import { fmtDateTime, fmtTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import type { ProductionTask, ProjectOverview } from '@/types/entities'
 import { summarizeTeam } from '@/features/dashboard/FeaturedEventCard'
@@ -83,6 +83,15 @@ export function EventHero({ project: p, overview: o, tasks, finance, clientHref,
         </div>
 
         {confirmed && <StageStepper stage={p.production_stage} className="mt-4" />}
+        {confirmed && p.production_stage === 'awaiting_approval' && (
+          <p role="status" className="mt-3 flex items-start gap-2 rounded-xl bg-caution/30 px-3 py-2 text-[13px]">
+            <Hourglass className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>
+              <strong className="font-semibold">Waiting for client approval</strong>
+              {p.shoot_completed_at ? ` since ${fmtDateTime(p.shoot_completed_at, tz)}` : ''}. Editing starts once the approval is recorded in the Production tab.
+            </span>
+          </p>
+        )}
 
         <dl className={cn('mt-4 grid grid-cols-1 divide-y divide-line overflow-hidden rounded-xl border border-line sm:grid-cols-2 sm:divide-y-0 lg:divide-x', finance ? 'lg:grid-cols-5' : 'lg:grid-cols-4')}>
           <Fact icon={<CalendarClock />} label={upcoming ? 'Next session' : 'Last session'} className="sm:border-b sm:border-line lg:border-b-0">

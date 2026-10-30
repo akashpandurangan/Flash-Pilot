@@ -5,7 +5,7 @@ import { Avatar, Skeleton } from '@/components/ui/display'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { StageBadge } from '@/components/ui/status'
 import { EVENT_TYPE_LABELS } from '@/lib/constants'
-import { eventProgress, type EventLite } from '@/lib/dashboard'
+import { effectiveStage, eventProgress, type EventLite } from '@/lib/dashboard'
 import { formatInTimeZone } from 'date-fns-tz'
 import { countdownLabel, daysFromToday, fmtTime } from '@/lib/time'
 import { cn, pluralize } from '@/lib/utils'
@@ -36,8 +36,8 @@ export function summarizeTeam(detail: ProjectDetail | null | undefined) {
 }
 
 /**
- * The hero of the dashboard: the next event, with its key facts. Events don't have cover photos yet,
- * so the top is a designed placeholder rather than a stock image.
+ * The hero of the dashboard: the nearest upcoming event, with its key facts. The whole card opens the
+ * event. Events don't have cover photos yet, so the top is a designed placeholder rather than a stock image.
  */
 export function FeaturedEventCard({ event, detail, tasks, detailLoading, tz }: {
   event: EventLite
@@ -52,13 +52,14 @@ export function FeaturedEventCard({ event, detail, tasks, detailLoading, tz }: {
   const next = upcoming ?? sessions.at(-1) ?? null
   const venue = next?.venue_name || next?.venue_address || null
   const team = summarizeTeam(detail)
+  const stage = effectiveStage(event, new Date(now))
   const done = tasks?.filter((t) => t.is_done).length ?? 0
-  const progress = eventProgress(tasks ? { done, total: tasks.length } : null, event.production_stage)
+  const progress = eventProgress(tasks ? { done, total: tasks.length } : null, stage)
   const pill = BOOKING_PILL[event.booking_status]
   const when = next?.starts_at ?? event.next_event_at ?? event.first_event_at
 
   return (
-    <article className="flex h-full flex-col rounded-panel border border-line bg-surface p-1.5 shadow-card" aria-label="Featured event">
+    <article className="group relative flex h-full flex-col rounded-panel border border-line bg-surface p-1.5 shadow-card" aria-label="Featured event">
       <div className="relative flex min-h-[10.5rem] flex-1">
         <div className="relative w-full overflow-hidden rounded-[18px] bg-dark" aria-hidden>
           <div
@@ -90,13 +91,9 @@ export function FeaturedEventCard({ event, detail, tasks, detailLoading, tz }: {
             <h2 className="truncate text-xl font-semibold leading-tight tracking-tight sm:text-[22px]">{event.name}</h2>
             <p className="mt-0.5 truncate text-[13px] text-ink-muted md:text-sm">{event.client_name} · {venue ?? 'Venue to be confirmed'}</p>
           </div>
-          <Link
-            to={`/events/${event.id}`}
-            aria-label={`Open ${event.name}`}
-            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-subtle transition-colors hover:bg-accent"
-          >
-            <ArrowUpRight className="size-4" aria-hidden />
-          </Link>
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-subtle transition-colors group-hover:bg-accent" aria-hidden>
+            <ArrowUpRight className="size-4" />
+          </span>
         </div>
 
         <div className="mt-3.5 flex items-center gap-3">
@@ -113,8 +110,8 @@ export function FeaturedEventCard({ event, detail, tasks, detailLoading, tz }: {
             </dd>
           </div>
           <div className="p-3">
-            <dt className="flex items-center gap-1.5 text-xs text-ink-muted"><Clapperboard className="size-3.5" aria-hidden /> Stage</dt>
-            <dd className="mt-1.5">{event.booking_status === 'confirmed' ? <StageBadge stage={event.production_stage} /> : <span className="text-[13px] font-semibold">Not started</span>}</dd>
+            <dt className="flex items-center gap-1.5 text-xs text-ink-muted"><Clapperboard className="size-3.5" aria-hidden /> Production</dt>
+            <dd className="mt-1.5"><StageBadge stage={stage} /></dd>
           </div>
           <div className="p-3">
             <dt className="flex items-center gap-1.5 text-xs text-ink-muted"><Users className="size-3.5" aria-hidden /> Team</dt>
@@ -133,6 +130,13 @@ export function FeaturedEventCard({ event, detail, tasks, detailLoading, tz }: {
           </div>
         </dl>
       </div>
+
+      {/* One link over the whole card, so the event opens from anywhere on it. */}
+      <Link
+        to={`/events/${event.id}`}
+        aria-label={`Open ${event.name}`}
+        className="absolute inset-0 z-20 rounded-panel outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+      />
     </article>
   )
 }

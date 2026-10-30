@@ -7,8 +7,9 @@ import { cn } from '@/lib/utils'
 import type { ProductionStage } from '@/types/entities'
 
 /**
- * Where every confirmed event is in production. Segment widths follow the counts; the busiest open
- * stage is lime until you point at another one. Each segment opens the Events list for that stage.
+ * Where every live (not cancelled or archived) event is in its lifecycle. Segment widths follow the
+ * counts; the busiest open stage is lime until you point at another one. Each segment opens the Events
+ * list for that stage. The counts come from the same rows and rules as the Studio overview numbers.
  */
 export function EventPipeline({ counts }: { counts: Partial<Record<ProductionStage, number>> }) {
   const segments = pipelineSegments(counts)
@@ -24,21 +25,22 @@ export function EventPipeline({ counts }: { counts: Partial<Record<ProductionSta
           View all events <ChevronRight className="size-3.5" aria-hidden />
         </Link>
       </div>
-      <p className="mt-0.5 text-xs text-ink-muted">{total === 0 ? 'No confirmed events in production yet' : `${total} confirmed ${total === 1 ? 'event' : 'events'} by stage`}</p>
+      <p className="mt-0.5 text-xs text-ink-muted">{total === 0 ? 'No events in the pipeline yet' : `${total} ${total === 1 ? 'event' : 'events'} by stage`}</p>
 
       <div className="-mx-1 mt-3.5 overflow-x-auto px-1 pb-1 scrollbar-thin">
-        <ol className="flex min-w-[360px] gap-1.5" aria-label="Events by production stage">
+        <ol className="flex min-w-[390px] gap-1.5" aria-label="Events by production stage">
           {segments.map((s) => {
             const selected = active === s.stage
             return (
-              <li key={s.stage} className="min-w-[64px]" style={{ flexGrow: segmentWeight(s, segments), flexBasis: 0 }}>
+              <li key={s.stage} className="min-w-[60px]" style={{ flexGrow: segmentWeight(s, segments), flexBasis: 0 }}>
                 <Link
                   to={`/events?stage=${s.stage}`}
                   onMouseEnter={() => setPicked(s.stage)}
                   onFocus={() => setPicked(s.stage)}
                   onMouseLeave={() => setPicked(null)}
                   onBlur={() => setPicked(null)}
-                  aria-label={`${s.label}: ${s.count} ${s.count === 1 ? 'event' : 'events'}`}
+                  aria-label={`${s.fullLabel}: ${s.count} ${s.count === 1 ? 'event' : 'events'}`}
+                  title={s.fullLabel}
                   className="group block"
                 >
                   <span

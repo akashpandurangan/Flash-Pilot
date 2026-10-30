@@ -44,10 +44,10 @@ describe('permission matrix', () => {
 
   it('hides navigation the role cannot use', () => {
     const labels = (a: Actor) => visibleNav(a).map((n) => n.label)
-    expect(labels(owner)).toEqual(['Overview', 'Events', 'Calendar', 'Clients', 'Team', 'Equipment', 'Payments', 'Production', 'Deliveries', 'Reports'])
+    expect(labels(owner)).toEqual(['Overview', 'Events', 'Calendar', 'Clients', 'Team', 'Equipment', 'Payments', 'Reports'])
     expect(labels(managerNoFin)).not.toContain('Payments')
     expect(labels(managerFin)).toContain('Payments')
-    expect(labels(photographer)).toEqual(['Overview', 'Events', 'Calendar', 'Production', 'Deliveries'])
+    expect(labels(photographer)).toEqual(['Overview', 'Events', 'Calendar'])
   })
 
   it('limits checklist phases by role', () => {
@@ -72,17 +72,18 @@ describe('sidebar highlighting', () => {
     expect(active('/clients/xyz')).toEqual(['clients'])
   })
 
-  it('uses the stage filter to pick Events, Production or Deliveries', () => {
-    expect(active('/events', '?stage=production')).toEqual(['production'])
-    expect(active('/events', '?stage=editing')).toEqual(['production'])
-    expect(active('/events', '?stage=ready_for_delivery')).toEqual(['deliveries'])
-    expect(active('/events', '?stage=delivered')).toEqual(['deliveries'])
-    expect(active('/events', '?stage=upcoming')).toEqual(['events'])
+  it('keeps Events highlighted whatever stage filter is applied', () => {
+    for (const stage of ['upcoming', 'production', 'awaiting_approval', 'editing', 'out_for_delivery', 'delivered']) {
+      expect(active('/events', `?stage=${stage}`), stage).toEqual(['events'])
+    }
     expect(active('/events', '?booking=cancelled')).toEqual(['events'])
   })
 
-  it('points Production and Deliveries at filtered Events lists, not new pages', () => {
-    expect(item('production').to).toBe('/events?stage=production')
-    expect(item('deliveries').to).toBe('/events?stage=ready_for_delivery')
+  it('has no separate Production or Deliveries entries', () => {
+    expect(NAV_ITEMS.map((n) => n.key)).not.toContain('production')
+    expect(NAV_ITEMS.map((n) => n.key)).not.toContain('deliveries')
+    expect(NAV_ITEMS.map((n) => n.label)).not.toContain('Production')
+    expect(NAV_ITEMS.map((n) => n.label)).not.toContain('Deliveries')
+    expect(item('events').to).toBe('/events')
   })
 })

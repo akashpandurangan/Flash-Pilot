@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { formatDistanceToNowStrict } from 'date-fns'
-import { Camera, CalendarCheck, Clapperboard, Contact, TriangleAlert, UsersRound } from 'lucide-react'
+import { Camera, CalendarCheck, Clapperboard, Contact, Plus, TriangleAlert, UsersRound } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { getDashboardKpis } from '@/api/dashboard'
@@ -8,14 +8,16 @@ import { listFinancials } from '@/api/payments'
 import { getProject, listActiveProjects, listRecentActivity, listTasks } from '@/api/projects'
 import { listInventory, listScheduleEvents } from '@/api/schedule'
 import { HeaderContent } from '@/components/layout/header-slot'
+import { Button } from '@/components/ui/button'
 import { ActivityFeed } from '@/components/ui/activity-feed'
 import { Card, EmptyState, ErrorState, Panel, Skeleton } from '@/components/ui/display'
 import { MetricCard } from '@/components/ui/metric-card'
 import { buildActionItems, countAttentionEvents } from '@/lib/alerts'
-import { attentionHeadline, buildInsights, computeEventKpis, pickFeaturedEvent } from '@/lib/dashboard'
+import { attentionHeadline, buildInsights, computeEventKpis, pickFeaturedEvent, pipelineCounts, todaysEvents } from '@/lib/dashboard'
 import { formatMoney } from '@/lib/money'
 import { toConflictEvent } from '@/lib/schedule'
-import { cn } from '@/lib/utils'
+import { todayKey, zonedDayBounds } from '@/lib/time'
+import { cn, pluralize } from '@/lib/utils'
 import { useStudio } from '@/features/studio/StudioProvider'
 import { useNow } from '@/hooks/hooks'
 import { AttentionTable } from './AttentionTable'
@@ -41,14 +43,17 @@ export default function DashboardPage() {
   const projects = useQuery({ queryKey: ['projects', 'active', studio.id], queryFn: () => listActiveProjects(studio.id) })
   const schedule = useQuery({
     queryKey: ['schedule', studio.id, 'dashboard'],
-    queryFn: () => listScheduleEvents({ studioId: studio.id, from: new Date().toISOString(), to: new Date(Date.now() + 60 * 86_400_000).toISOString() }),
+    // from the start of today in the studio's zone, so "Today's events" still counts sessions that already began
+    queryFn: () => listScheduleEvents({ studioId: studio.id, from: zonedDayBounds(todayKey(tz), tz).start, to: new Date(Date.now() + 60 * 86_400_000).toISOString() }),
   })
   const financials = useQuery({ queryKey: ['financials', studio.id], queryFn: () => listFinancials(studio.id), enabled: canFinance })
   const inventory = useQuery({ queryKey: ['inventory', studio.id], queryFn: () => listInventory(studio.id), enabled: isStaff })
   const activity = useQuery({ queryKey: ['activity', studio.id], queryFn: () => listRecentActivity(studio.id, 8) })
 
   const events = useMemo(() => projects.data ?? [], [projects.data])
-  const featured = useMemo(() => pickFeaturedEvent(events), [events])
+  // One clock for every number below, so the KPIs, the featured card and the pipeline can never disagree about "now".
+  const clock = useMemo(() => new Date(now), [now])
+  const featured = useMemo(() => pickFeaturedEvent(events, clock), [events, clock])
   const featuredDetail = useQuery({ queryKey: ['project', featured?.id], queryFn: () => getProject(featured!.id), enabled: !!featured })
   const featuredTasks = useQuery({ queryKey: ['project-tasks', featured?.id], queryFn: () => listTasks(featured!.id), enabled: !!featured })
 
@@ -61,10 +66,11 @@ export default function DashboardPage() {
   }, [isStaff, schedule.data, projects.data, financials.data, inventory.data, canFinance, tz, currency])
 
   const k = kpis.data
-  const derived = useMemo(() => computeEventKpis(events, items, new Date(now)), [events, items, now])
-  const insights = useMemo(() => buildInsights(items, events, new Date(now)), [items, events, now])
+  const derived = useMemo(() => computeEventKpis(events, items, clock), [events, items, clock])
+  const today = useMemo(() => todaysEvents(schedule.data ?? [], tz, clock), [schedule.data, tz, clock])
+  const stages = useMemo(() => pipelineCounts(events, clock), [events, clock])
+  const insights = useMemo(() => buildInsights(items, events, clock), [items, events, clock])
   const attentionEvents = countAttentionEvents(items)
-  const stages = k?.stage_counts ?? {}
 
   // sessions assigned in the next 7 days - the fourth card for people who don't manage the studio
   const sessionsThisWeek = useMemo(
@@ -73,6 +79,8 @@ export default function DashboardPage() {
   )
 
   const loading = kpis.isLoading || projects.isLoading
+  // "Today's events" comes from the schedule query, so the cards wait for it rather than flashing a 0
+  const cardsLoading = loading || schedule.isLoading
   const brandNew = !loading && !kpis.isError && !projects.isError && events.length === 0
   const updatedAt = Math.max(schedule.dataUpdatedAt, projects.dataUpdatedAt, 0)
   const updatedLabel = updatedAt ? ago(updatedAt, now) : undefined
@@ -122,11 +130,16 @@ export default function DashboardPage() {
             <Card className="rounded-panel p-4 sm:p-5">
               <h2 className="mb-3 px-0.5 text-[17px] font-semibold tracking-tight">Studio overview</h2>
               <div className={cn('grid grid-cols-2 gap-3 md:grid-cols-4', loading || featured ? 'xl:grid-cols-2' : 'xl:grid-cols-4')}>
-                {loading ? Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-28 rounded-card" />) : (
+                {cardsLoading ? Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-28 rounded-card" />) : (
                   <>
                     <MetricCard tone="dark" label="Upcoming events" value={derived.upcoming} hint={`${derived.upcomingNext7} in the next 7 days`} to="/events?stage=upcoming" />
-                    <MetricCard label="In production" value={stages.production ?? 0} hint={derived.awaitingEditing > 0 ? `${derived.awaitingEditing} shot, awaiting editing` : 'Shoots in progress'} to="/events?stage=production" />
-                    <MetricCard label="Editing in progress" value={stages.editing ?? 0} hint={`${stages.ready_for_delivery ?? 0} ready for delivery`} to="/events?stage=editing" />
+                    <MetricCard
+                      label="Today's events"
+                      value={schedule.isError ? '—' : today.events}
+                      hint={schedule.isError ? 'Could not load today' : today.events === 0 ? 'No shoots scheduled today' : `${pluralize(today.sessions, 'session')} scheduled today`}
+                      to={`/events?from=${todayKey(tz, clock)}&to=${todayKey(tz, clock)}`}
+                    />
+                    <MetricCard label="Ready for delivery" value={derived.readyForDelivery} hint="Out for delivery to clients" to="/events?stage=out_for_delivery" />
                     {isStaff ? (
                       <MetricCard
                         label="Needs attention"
@@ -152,6 +165,7 @@ export default function DashboardPage() {
                 icon={<CalendarCheck />}
                 title="No upcoming events"
                 description={isStaff ? 'Create an event and the next one will be featured here.' : 'When you are assigned to an event, the next one is featured here.'}
+                action={isStaff ? <Button asChild size="sm"><Link to="/events/new"><Plus className="size-3.5" /> Create event</Link></Button> : undefined}
               />
             )}
           </div>

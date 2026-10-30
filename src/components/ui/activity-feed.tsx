@@ -37,7 +37,7 @@ export function activityIcon(action: string): IconType {
   if (action.includes('payment') || action === 'advance_recorded') return IndianRupee
   if (action === 'team_assigned' || action === 'editor_assigned') return UserPlus
   if (action === 'team_unassigned') return UserMinus
-  if (action === 'workflow_mark_delivered' || action === 'delivery_recorded') return Truck
+  if (action === 'workflow_mark_delivered' || action === 'workflow_mark_out_for_delivery' || action === 'delivery_recorded') return Truck
   if (action.startsWith('workflow_')) return Clapperboard
   if (action === 'task_completed') return CheckCheck
   if (action === 'task_reopened') return RotateCcw

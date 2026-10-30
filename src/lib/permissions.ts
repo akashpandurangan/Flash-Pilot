@@ -71,7 +71,7 @@ export function canCompletePhase(role: AccessRole, phase: TaskPhase): boolean {
 }
 
 export type NavSection = 'main' | 'studio' | 'workspace'
-export type NavBadgeKey = 'events' | 'production' | 'deliveries'
+export type NavBadgeKey = 'events'
 
 export interface NavItem {
   /** Stable identifier (also the icon key). */
@@ -87,8 +87,8 @@ export interface NavItem {
 export const NAV_SECTION_LABELS: Record<NavSection, string> = { main: 'Main', studio: 'Studio management', workspace: 'Workspace' }
 
 /**
- * Production and Deliveries are not separate pages: they are the Events list filtered to the
- * matching production stages, so they reuse the same data, permissions and routes.
+ * Production and delivery are not navigation items: they are stages of an event, reached from the
+ * Events list (stage filters), the dashboard pipeline and each event's own page.
  */
 export const NAV_ITEMS: NavItem[] = [
   { key: 'overview', to: '/', label: 'Overview', section: 'main', permission: 'overview.view', end: true },
@@ -98,8 +98,6 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'team', to: '/team', label: 'Team', section: 'studio', permission: 'team.view' },
   { key: 'equipment', to: '/equipment', label: 'Equipment', section: 'studio', permission: 'equipment.view' },
   { key: 'payments', to: '/payments', label: 'Payments', section: 'studio', permission: 'finance.view' },
-  { key: 'production', to: '/events?stage=production', label: 'Production', section: 'workspace', permission: 'projects.view', badge: 'production' },
-  { key: 'deliveries', to: '/events?stage=ready_for_delivery', label: 'Deliveries', section: 'workspace', permission: 'projects.view', badge: 'deliveries' },
   { key: 'reports', to: '/reports', label: 'Reports', section: 'workspace', permission: 'reports.view' },
 ]
 
@@ -107,20 +105,8 @@ export function visibleNav(actor: Actor | null | undefined): NavItem[] {
   return NAV_ITEMS.filter((item) => can(actor, item.permission))
 }
 
-const PRODUCTION_STAGES_NAV = ['production', 'editing']
-const DELIVERY_STAGES_NAV = ['ready_for_delivery', 'delivered']
-
-/** Which sidebar entry is highlighted for the current URL (the stage filter decides between Events / Production / Deliveries). */
-export function isNavActive(item: NavItem, pathname: string, search: string): boolean {
+/** Which sidebar entry is highlighted for the current URL. */
+export function isNavActive(item: NavItem, pathname: string, _search = ''): boolean {
   if (item.key === 'overview') return pathname === '/'
-  if (item.key === 'events' || item.key === 'production' || item.key === 'deliveries') {
-    if (pathname !== '/events' && !pathname.startsWith('/events/')) return false
-    const stage = pathname === '/events' ? new URLSearchParams(search).get('stage') ?? '' : ''
-    const inProduction = PRODUCTION_STAGES_NAV.includes(stage)
-    const inDeliveries = DELIVERY_STAGES_NAV.includes(stage)
-    if (item.key === 'production') return inProduction
-    if (item.key === 'deliveries') return inDeliveries
-    return !inProduction && !inDeliveries
-  }
   return pathname === item.to || pathname.startsWith(`${item.to}/`)
 }

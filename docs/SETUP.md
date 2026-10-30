@@ -50,6 +50,8 @@ destructive statements.
 | `…05_realtime_storage_cron.sql` | Realtime publication, `studio-logos` bucket policies, the 5-minute `pg_cron` job |
 | `…06_event_team.sql` | `set_event_team()` for changing a team after creation |
 | `…07_event_terminology.sql` | Re-words what the database writes (notifications, activity log, errors, stored links) to the *Events / Sessions* terms. Function replacements only - no schema change |
+| `…08_workflow_stages.sql` | The new production stages: adds `awaiting_approval` and renames `ready_for_delivery` to `out_for_delivery` (existing rows move with the rename). Enum change only, so it can commit before 09 uses the new values |
+| `…09_event_lifecycle.sql` | Client-approval columns, `advance_event_lifecycle()` + its **every-minute `pg_cron` job**, the six-stage `project_workflow_action()`, the new `dashboard_kpis()`, and a one-off catch-up of existing events |
 
 **With the CLI (recommended)**
 
@@ -61,9 +63,15 @@ supabase db push
 
 **Without the CLI:** open **SQL Editor** and run each file, in order, one at a time.
 
-> Before running file 05, enable **pg_cron** (Database → Extensions → `pg_cron`). If it is not enabled the
-> migration still succeeds, prints a notice and skips the job - you can enable the extension later and run the
-> `cron.schedule(...)` statement from that file by hand.
+> Before running files 05 and 09, enable **pg_cron** (Database → Extensions → `pg_cron`). If it is not enabled the
+> migrations still succeed, print a notice and skip the jobs - you can enable the extension later and run the
+> `cron.schedule(...)` statements from those files by hand. Without the 09 job events are **not** moved on
+> automatically (the dashboard still shows them in the right stage, but the stored stage - and the Event Details
+> page - only change when someone does it by hand).
+>
+> **Deploy order:** apply the migrations *before* (or together with) deploying the new front end. The new screens
+> call `approve_client` / `mark_out_for_delivery`, which do not exist until file 09 is applied. Files 08 and 09 must
+> be separate transactions (the CLI and the SQL editor both run one file at a time, which is what you want).
 
 ## 4. Authentication settings
 
@@ -123,14 +131,18 @@ service-role key in the frontend or in any `VITE_` variable.
 
 ## 7. Scheduling reminders (important)
 
-Flash Pilot has two server-side jobs; both are safe to run repeatedly and from several places at once because
+Flash Pilot has three server-side jobs; both are safe to run repeatedly and from several places at once because
 every notification has a unique de-duplication key and deliveries are claimed with row locks.
 
 1. **In-app reminders & deadlines - already scheduled.** Migration 05 registers a `pg_cron` job
    (`flashpilot-process-notifications`, every 5 minutes) that calls `select public.process_due_notifications()`.
    Check it with `select * from cron.job;`. Reminders therefore fire within ~5 minutes of their due time
    ("about a day before").
-2. **E-mail delivery - needs the Edge Function on a schedule.** The queue is filled by job 1; the function sends it.
+2. **Event lifecycle - already scheduled.** Migration 09 registers `flashpilot-advance-lifecycle` (every minute), which calls
+   `select public.advance_event_lifecycle()`: confirmed events move *Upcoming → Production* at their first session's start
+   and *Production → Waiting for Client Approval* at their last session's end, whether or not anyone is signed in.
+   Check it with `select * from cron.job;` and `select * from cron.job_run_details order by start_time desc limit 5;`.
+3. **E-mail delivery - needs the Edge Function on a schedule.** The queue is filled by job 1; the function sends it.
    Store the secret once, then schedule an HTTP call:
 
    ```sql
@@ -211,6 +223,9 @@ After configuring a real project, run through this once. It covers what the auto
    `/payments`, `/clients` or `/team` by URL.
 7. In two browsers (owner + photographer) change the event's stage and confirm the other window updates without
    a refresh (Realtime).
+   Then create a confirmed event whose first session starts 2-3 minutes from now and ends 2 minutes later: it should
+   move to *Production* by itself, then to *Waiting for Client Approval* (check `cron.job_run_details` if not), and stay
+   there until the owner records approval.
 8. Record a payment bigger than the balance: you must be asked to confirm the overpayment.
 9. *Notifications → Email delivery* (owner): with Resend configured the row is *Sent*; without it, *Not sent*
    with the reason - never a false "sent".

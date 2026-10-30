@@ -6,7 +6,7 @@ export type TeamRole = 'photographer' | 'videographer' | 'editor' | 'assistant' 
 export type InviteStatus = 'none' | 'pending' | 'accepted'
 export type EventType = 'wedding' | 'engagement' | 'reception' | 'birthday' | 'maternity' | 'pre_wedding' | 'corporate' | 'other'
 export type BookingStatus = 'inquiry' | 'confirmed' | 'cancelled'
-export type ProductionStage = 'upcoming' | 'production' | 'editing' | 'ready_for_delivery' | 'delivered'
+export type ProductionStage = 'upcoming' | 'production' | 'awaiting_approval' | 'editing' | 'out_for_delivery' | 'delivered'
 export type AssignmentRole = 'lead_photographer' | 'second_photographer' | 'videographer' | 'assistant' | 'editor' | 'other'
 export type EquipmentCategory = 'still_camera' | 'video_camera' | 'lens' | 'tripod' | 'gimbal' | 'lighting' | 'flash' | 'drone' | 'microphone' | 'other'
 export type EquipmentCondition = 'excellent' | 'good' | 'fair' | 'needs_repair' | 'out_of_service'
@@ -101,8 +101,15 @@ export interface Project {
   shoot_completed_at: string | null
   editing_started_at: string | null
   editing_completed_at: string | null
+  /** When the event went out for delivery (the column keeps its old name). */
   ready_for_delivery_at: string | null
   delivered_at: string | null
+  client_approved_at: string | null
+  client_approved_by_name: string | null
+  client_approval_note: string | null
+  /** Set once the scheduler (or a person) has made the production start / end transition; see advance_event_lifecycle(). */
+  production_start_applied_at: string | null
+  production_end_applied_at: string | null
   archived_at: string | null
   created_at: string
   updated_at: string
@@ -305,8 +312,10 @@ export interface DashboardKpis {
   active_projects: number
   inquiries: number
   upcoming_events: number
+  upcoming_next_7_days: number
   today_events: number
   in_production: number
+  ready_for_delivery: number
   pending_delivery: number
   outstanding_amount: number | null
   stage_counts: Partial<Record<ProductionStage, number>>

@@ -1,22 +1,24 @@
+import { PRODUCTION_STAGES } from './constants'
 import type { BookingStatus, ProductionStage } from '@/types/entities'
 
 /**
  * The status chips on the Events page. They are a friendlier face on the two existing URL filters
  * (`booking`, `stage`), so old links and the dashboard / sidebar links keep working unchanged.
  */
-export type EventChip = 'all' | 'upcoming' | 'production' | 'editing' | 'ready_for_delivery' | 'delivered' | 'cancelled'
+export type EventChip = 'all' | ProductionStage | 'cancelled'
 
 export const EVENT_CHIPS: { value: EventChip; label: string }[] = [
   { value: 'all', label: 'All Events' },
   { value: 'upcoming', label: 'Upcoming' },
   { value: 'production', label: 'In Production' },
+  { value: 'awaiting_approval', label: 'Waiting for Approval' },
   { value: 'editing', label: 'Editing' },
-  { value: 'ready_for_delivery', label: 'Ready for Delivery' },
+  { value: 'out_for_delivery', label: 'Out for Delivery' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
 ]
 
-const STAGE_CHIPS: ProductionStage[] = ['upcoming', 'production', 'editing', 'ready_for_delivery', 'delivered']
+const STAGE_CHIPS: ProductionStage[] = PRODUCTION_STAGES
 
 export function chipFromParams(p: { booking: string; stage: string }): EventChip {
   if (p.booking === 'cancelled') return 'cancelled'

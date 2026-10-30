@@ -344,8 +344,8 @@ describe('role-based access (RLS)', () => {
 
 describe('production workflow state machine', () => {
   let project: string
-  const act = (user: string, action: string, id = project) =>
-    q<{ production_stage: string; booking_status: string }>(user, `select production_stage, booking_status from public.project_workflow_action($1,$2)`, [id, action])
+  const act = (user: string, action: string, id = project, note: string | null = null) =>
+    q<{ production_stage: string; booking_status: string }>(user, `select production_stage, booking_status from public.project_workflow_action($1,$2,$3)`, [id, action, note])
   const failAct = (user: string, action: string, id = project) =>
     t.as(user, () => t.fails(`select public.project_workflow_action($1,$2)`, [id, action]))
 
@@ -353,47 +353,76 @@ describe('production workflow state machine', () => {
     project = await saveProject(ids.owner, payload({ project: { name: 'Workflow Test', editor_id: ids.editorEmp }, initial_payment: null }))
   })
 
-  it('walks upcoming -> production -> editing -> ready -> delivered with the right people', async () => {
+  it('walks upcoming -> production -> waiting for approval -> editing -> out for delivery -> delivered with the right people', async () => {
     expect(await failAct(ids.photo2, 'start_production')).toMatch(/forbidden/) // not on this project
     expect((await act(ids.photo1, 'start_production'))[0]!.production_stage).toBe('production')
 
-    expect(await failAct(ids.owner, 'start_editing')).toMatch(/complete the shoot/)
-    await act(ids.photo1, 'complete_shoot')
-    expect(await failAct(ids.photo1, 'start_editing')).toMatch(/forbidden/) // photographers hand over, they do not start editing
-    expect((await act(ids.owner, 'start_editing'))[0]!.production_stage).toBe('editing')
+    // production ends -> the studio waits for the client; editing cannot start by itself
+    expect((await act(ids.photo1, 'complete_shoot'))[0]!.production_stage).toBe('awaiting_approval')
+    expect(await failAct(ids.editor, 'complete_editing')).toMatch(/editing is not in progress/)
+    expect(await failAct(ids.photo1, 'approve_client')).toMatch(/forbidden/) // crew cannot record approval
+    expect(await failAct(ids.editor, 'approve_client')).toMatch(/forbidden/)
+    expect(await failAct(ids.owner, 'start_editing')).toMatch(/unknown_action/) // there is no way round the approval
 
-    expect(await failAct(ids.editor, 'mark_ready')).toMatch(/finish editing first/)
+    expect((await act(ids.owner, 'approve_client', project, 'Approved on WhatsApp'))[0]!.production_stage).toBe('editing')
+    expect(await failAct(ids.owner, 'approve_client')).toMatch(/not waiting for client approval/)
+
+    expect(await failAct(ids.editor, 'mark_out_for_delivery')).toMatch(/finish editing first/)
     await act(ids.editor, 'complete_editing')
-    expect((await act(ids.editor, 'mark_ready'))[0]!.production_stage).toBe('ready_for_delivery')
+    expect((await act(ids.editor, 'mark_out_for_delivery'))[0]!.production_stage).toBe('out_for_delivery')
 
     expect(await failAct(ids.editor, 'mark_delivered')).toMatch(/forbidden/)
-    expect(await failAct(ids.owner, 'mark_delivered')).toMatch(/delivery_details_required/)
-    await q(ids.owner, `insert into public.project_deliveries (project_id, studio_id, method, delivered_on, link_url) values ($1,$2,'online_gallery',current_date,'https://gallery.test/abc')`, [project, ids.studio])
     expect((await act(ids.owner, 'mark_delivered'))[0]!.production_stage).toBe('delivered')
 
-    const d = await t.one<{ confirmed_at: string | null }>(`select confirmed_at from public.project_deliveries where project_id=$1`, [project])
+    const d = await t.one<{ confirmed_at: string | null; delivered_on: string | null }>(`select confirmed_at, delivered_on from public.project_deliveries where project_id=$1`, [project])
     expect(d.confirmed_at).not.toBeNull()
+    expect(d.delivered_on).not.toBeNull() // filled in from the studio-local date when nobody typed one
   })
 
-  it('persists delivery details and allows delivery with an outstanding balance', async () => {
-    const d = await t.one<{ link_url: string }>(`select link_url from public.project_deliveries where project_id=$1`, [project])
-    expect(d.link_url).toBe('https://gallery.test/abc')
+  it('records the approval: when, who confirmed it and the note', async () => {
+    const p = await t.one<{ client_approved_at: string | null; client_approved_by: string; client_approved_by_name: string; client_approval_note: string }>(
+      `select client_approved_at, client_approved_by, client_approved_by_name, client_approval_note from public.projects where id=$1`, [project])
+    expect(p.client_approved_at).not.toBeNull()
+    expect(p.client_approved_by).toBe(ids.owner)
+    expect(p.client_approved_by_name).toBe('Olivia Owner')
+    expect(p.client_approval_note).toBe('Approved on WhatsApp')
+  })
+
+  it('allows delivery with an outstanding balance', async () => {
     const f = await t.one<{ balance: string }>(`select balance from public.project_financials where project_id=$1`, [project])
     expect(Number(f.balance)).toBe(100000)
   })
 
-  it('records who did what and when', async () => {
-    const logs = await t.rows<{ action: string; actor_name: string }>(`select action, actor_name from public.activity_logs where project_id=$1 and action like 'workflow_%' order by created_at, action`, [project])
-    expect(logs.map((l) => l.action)).toEqual(expect.arrayContaining(['workflow_start_production', 'workflow_complete_shoot', 'workflow_complete_editing', 'workflow_mark_delivered']))
-    expect(logs.find((l) => l.action === 'workflow_complete_editing')?.actor_name).toBe('Ed Editor')
+  it('delivery details entered while out for delivery survive being marked delivered', async () => {
+    const p = await saveProject(ids.owner, payload({ project: { name: 'Delivery link' }, initial_payment: null }))
+    await act(ids.owner, 'start_production', p); await act(ids.owner, 'complete_shoot', p); await act(ids.owner, 'approve_client', p)
+    await act(ids.owner, 'complete_editing', p); await act(ids.owner, 'mark_out_for_delivery', p)
+    await q(ids.owner, `insert into public.project_deliveries (project_id, studio_id, method, link_url) values ($1,$2,'online_gallery','https://gallery.test/abc')`, [p, ids.studio])
+    await act(ids.owner, 'mark_delivered', p)
+    const d = await t.one<{ link_url: string; confirmed_at: string | null }>(`select link_url, confirmed_at from public.project_deliveries where project_id=$1`, [p])
+    expect(d.link_url).toBe('https://gallery.test/abc')
+    expect(d.confirmed_at).not.toBeNull()
   })
 
-  it('owner can step back one stage with milestones cleared', async () => {
-    const r = await act(ids.owner, 'revert')
-    expect(r[0]!.production_stage).toBe('ready_for_delivery')
+  it('records who did what and when', async () => {
+    const logs = await t.rows<{ action: string; actor_name: string }>(`select action, actor_name from public.activity_logs where project_id=$1 and action like 'workflow_%' order by created_at, action`, [project])
+    expect(logs.map((l) => l.action)).toEqual(expect.arrayContaining(['workflow_start_production', 'workflow_complete_shoot', 'workflow_approve_client', 'workflow_complete_editing', 'workflow_mark_out_for_delivery', 'workflow_mark_delivered']))
+    expect(logs.find((l) => l.action === 'workflow_complete_editing')?.actor_name).toBe('Ed Editor')
+    expect(logs.find((l) => l.action === 'workflow_approve_client')?.actor_name).toBe('Olivia Owner')
+  })
+
+  it('owner can step back one stage at a time; milestones clear but the history stays', async () => {
+    expect((await act(ids.owner, 'revert'))[0]!.production_stage).toBe('out_for_delivery')
     expect(await failAct(ids.editor, 'revert')).toMatch(/forbidden/)
     const row = await t.one<{ delivered_at: string | null }>(`select delivered_at from public.projects where id=$1`, [project])
     expect(row.delivered_at).toBeNull()
+    expect((await act(ids.owner, 'revert'))[0]!.production_stage).toBe('editing')
+    // stepping back from editing returns to the approval gate and clears the approval
+    expect((await act(ids.owner, 'revert'))[0]!.production_stage).toBe('awaiting_approval')
+    const p = await t.one<{ client_approved_at: string | null; client_approved_by_name: string | null }>(`select client_approved_at, client_approved_by_name from public.projects where id=$1`, [project])
+    expect(p).toEqual({ client_approved_at: null, client_approved_by_name: null })
+    const history = await t.rows(`select 1 from public.activity_logs where project_id=$1 and action='workflow_mark_delivered'`, [project])
+    expect(history).toHaveLength(1)
   })
 
   it('does not allow production changes on an inquiry or a cancelled booking', async () => {
@@ -416,7 +445,124 @@ describe('production workflow state machine', () => {
     const done = await t.one<{ done_by_name: string; is_done: boolean }>(`select done_by_name, is_done from public.production_tasks where id=$1`, [editing.id])
     expect(done).toEqual({ is_done: true, done_by_name: 'Ed Editor' })
     const p = await t.one<{ production_stage: string }>(`select production_stage from public.projects where id=$1`, [project])
-    expect(p.production_stage).toBe('ready_for_delivery') // unchanged by task completion
+    expect(p.production_stage).toBe('awaiting_approval') // unchanged by task completion
+  })
+})
+
+describe('automatic lifecycle (scheduler)', () => {
+  const at = (h: number) => new Date(Date.now() + h * 3_600_000)
+  const tick = async (when: Date) => (await t.one<{ r: { production_started: number; moved_to_approval: number } }>(`select public.advance_event_lifecycle($1) as r`, [when.toISOString()])).r
+  const stage = async (id: string) => (await t.one<{ production_stage: string }>(`select production_stage from public.projects where id=$1`, [id])).production_stage
+  const session = (title: string, startH: number, endH: number) => ({
+    title, event_type: 'wedding', starts_at: hours(startH), ends_at: hours(endH), venue_name: 'Hall', venue_address: 'Pune', assignments: [], equipment: [],
+  })
+  const create = (name: string, events: unknown[], booking = 'confirmed') =>
+    saveProject(ids.owner, payload({ project: { name, booking_status: booking }, events, initial_payment: null }))
+
+  it('starts production at the first session start and finishes it at the last session end', async () => {
+    const id = await create('Auto single', [session('Ceremony', 200, 204)])
+    await tick(at(199))
+    expect(await stage(id)).toBe('upcoming') // not yet
+
+    await tick(at(200.01))
+    expect(await stage(id)).toBe('production')
+    const started = await t.one<{ production_started_at: string; first: string }>(
+      `select production_started_at, (select min(starts_at) from public.project_events where project_id=$1) as first from public.projects where id=$1`, [id])
+    expect(new Date(started.production_started_at).getTime()).toBe(new Date(started.first).getTime()) // the scheduled start, not "now"
+
+    await tick(at(203))
+    expect(await stage(id)).toBe('production') // still shooting
+
+    await tick(at(204.01))
+    expect(await stage(id)).toBe('awaiting_approval')
+    const done = await t.one<{ shoot_completed_at: string; last: string }>(
+      `select shoot_completed_at, (select max(ends_at) from public.project_events where project_id=$1) as last from public.projects where id=$1`, [id])
+    expect(new Date(done.shoot_completed_at).getTime()).toBe(new Date(done.last).getTime())
+
+    // and it stops there: no approval, no editing - however long it waits
+    await tick(at(24 * 365))
+    expect(await stage(id)).toBe('awaiting_approval')
+  })
+
+  it('waits for the last session of a multi-day event', async () => {
+    const id = await create('Auto multi', [session('Day 1', 300, 304), session('Day 2', 324, 328)])
+    await tick(at(310))
+    expect(await stage(id)).toBe('production') // day 1 is over, day 2 is still to come
+    await tick(at(326))
+    expect(await stage(id)).toBe('production')
+    await tick(at(329))
+    expect(await stage(id)).toBe('awaiting_approval')
+  })
+
+  it('catches up an event whose sessions are already over in a single run', async () => {
+    const id = await create('Auto catch-up', [session('Old', 400, 402)])
+    const r = await tick(at(500))
+    expect(await stage(id)).toBe('awaiting_approval')
+    expect(r.production_started).toBeGreaterThanOrEqual(1)
+    expect(r.moved_to_approval).toBeGreaterThanOrEqual(1)
+  })
+
+  it('never advances inquiries, cancelled bookings, archived events or cancelled sessions', async () => {
+    const inquiry = await create('Auto inquiry', [session('x', 600, 602)], 'inquiry')
+    const cancelled = await create('Auto cancelled', [session('x', 600, 602)])
+    await q(ids.owner, `select public.set_booking_status($1,'cancelled','no')`, [cancelled])
+    const archived = await create('Auto archived', [session('x', 600, 602)])
+    await q(ids.owner, `select public.set_project_archived($1, true)`, [archived])
+    const sessionCancelled = await create('Auto session cancelled', [session('x', 600, 602)])
+    await q(ids.owner, `update public.project_events set cancelled_at = now() where project_id=$1`, [sessionCancelled])
+
+    await tick(at(700))
+    for (const id of [inquiry, cancelled, archived, sessionCancelled]) expect(await stage(id)).toBe('upcoming')
+  })
+
+  it('does not run twice or fight itself', async () => {
+    const id = await create('Auto idempotent', [session('x', 800, 802)])
+    await tick(at(900))
+    const first = await t.one<{ n: number }>(`select count(*)::int as n from public.activity_logs where project_id=$1 and action like 'workflow_%'`, [id])
+    expect(first.n).toBe(2) // one start, one completion
+    const again = await tick(at(901))
+    expect(again.production_started).toBe(0)
+    expect(again.moved_to_approval).toBe(0)
+    const second = await t.one<{ n: number }>(`select count(*)::int as n from public.activity_logs where project_id=$1 and action like 'workflow_%'`, [id])
+    expect(second.n).toBe(2)
+  })
+
+  it('logs automatic steps as the system, with the scheduled time', async () => {
+    const id = await create('Auto log', [session('x', 1000, 1002)])
+    await tick(at(1100))
+    const logs = await t.rows<{ actor_name: string; metadata: { automatic?: boolean } }>(
+      `select actor_name, metadata from public.activity_logs where project_id=$1 and action like 'workflow_%' order by created_at`, [id])
+    expect(logs.map((l) => l.actor_name)).toEqual(['System', 'System'])
+    expect(logs.every((l) => l.metadata.automatic === true)).toBe(true)
+  })
+
+  it('does not undo a manual step back', async () => {
+    const id = await create('Auto revert', [session('x', 1200, 1202)])
+    await tick(at(1300))
+    expect(await stage(id)).toBe('awaiting_approval')
+    await q(ids.owner, `select public.project_workflow_action($1,'revert')`, [id])
+    expect(await stage(id)).toBe('production')
+    await tick(at(1301))
+    expect(await stage(id)).toBe('production') // the owner decided; the scheduler does not overrule it
+  })
+
+  it('re-arms when the schedule changes before the event starts', async () => {
+    const id = await create('Auto reschedule', [session('x', 1400, 1402)])
+    await tick(at(1401))
+    expect(await stage(id)).toBe('production')
+    await q(ids.owner, `select public.project_workflow_action($1,'revert')`, [id])
+    expect(await stage(id)).toBe('upcoming')
+    // moved to a later date: the scheduler picks it up again at the new time
+    await q(ids.owner, `update public.project_events set starts_at=$2, ends_at=$3 where project_id=$1`, [id, hours(1500), hours(1502)])
+    await tick(at(1450))
+    expect(await stage(id)).toBe('upcoming')
+    await tick(at(1503))
+    expect(await stage(id)).toBe('awaiting_approval')
+  })
+
+  it('is not callable by signed-in users', async () => {
+    expect(await t.as(ids.owner, () => t.fails(`select public.advance_event_lifecycle()`))).toMatch(/permission denied/)
+    expect(await t.asAnon(() => t.fails(`select public.advance_event_lifecycle()`))).toMatch(/permission denied/)
   })
 })
 

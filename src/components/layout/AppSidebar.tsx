@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import {
-  Aperture, BarChart3, CalendarCheck, CalendarDays, Camera, ChevronsLeft, ChevronsRight, Clapperboard, Contact, IndianRupee,
-  LayoutDashboard, LogOut, Settings, Truck, UserCog, UsersRound,
+  Aperture, BarChart3, CalendarCheck, CalendarDays, Camera, ChevronsLeft, ChevronsRight, Contact, IndianRupee,
+  LayoutDashboard, LogOut, Settings, UserCog, UsersRound,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
@@ -18,7 +18,7 @@ import { StudioSelector } from './StudioSelector'
 
 const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   overview: LayoutDashboard, events: CalendarCheck, calendar: CalendarDays, clients: Contact, team: UsersRound, equipment: Camera,
-  payments: IndianRupee, production: Clapperboard, deliveries: Truck, reports: BarChart3,
+  payments: IndianRupee, reports: BarChart3,
 }
 
 const SECTIONS: NavSection[] = ['main', 'studio', 'workspace']
@@ -40,12 +40,9 @@ export function AppSidebar({ collapsed = false, onToggleCollapsed, onNavigate }:
   // Same query key as the dashboard, so the numbers are shared and refreshed together (including via Realtime).
   const kpis = useQuery({ queryKey: ['dashboard', studio.id], queryFn: () => getDashboardKpis(studio.id), staleTime: 30_000 })
 
-  const stages = kpis.data?.stage_counts ?? {}
   const counts: Record<NavBadgeKey, number | undefined> = {
     // open work: confirmed events in progress plus inquiries still being decided
     events: kpis.data ? kpis.data.active_projects + kpis.data.inquiries : undefined,
-    production: kpis.data ? (stages.production ?? 0) + (stages.editing ?? 0) : undefined,
-    deliveries: kpis.data ? (stages.ready_for_delivery ?? 0) : undefined,
   }
 
   const items = visibleNav(actor)

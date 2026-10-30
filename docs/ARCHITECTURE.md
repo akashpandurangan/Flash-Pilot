@@ -97,10 +97,10 @@ Instants are stored in UTC. All entry and display uses the *studio's* zone (`dat
 | Money: amounts, payments, financial reports | ✔ | only with flag | | |
 | See events | all | all | assigned only | assigned (session or editor) only |
 | Client contact | full | full | name + phone | name only |
-| Start production / mark shoot done | ✔ | ✔ | ✔ (assigned) | |
-| Move to editing | ✔ | ✔ | | |
-| Mark editing done / ready for delivery | ✔ | ✔ | | ✔ (assigned) |
-| Mark delivered, record delivery, step back a stage | ✔ | ✔ | | |
+| Start / end production by hand (normally automatic) | ✔ | ✔ | ✔ (assigned) | |
+| Record client approval (moves to editing) | ✔ | ✔ | | |
+| Mark editing done / out for delivery | ✔ | ✔ | | ✔ (assigned) |
+| Mark delivered, add delivery link, step back a stage | ✔ | ✔ | | |
 | Tick checklist items | all phases | all phases | preparation, shoot | post, editing |
 
 Enforcement lives in `02_security.sql` (RLS policies, `employees_guard`, helper functions) and the RPCs, which
@@ -113,10 +113,28 @@ photographer's event).
 Booking: `inquiry ⇄ confirmed → cancelled → (reopen) inquiry`. Only **confirmed** bookings are scheduled,
 notified and reminded; cancelling releases reminders and equipment but keeps history.
 
-Production: `upcoming → production → editing → ready_for_delivery → delivered`, with milestones inside stages:
-*shoot completed* must precede editing; *editing completed* must precede ready-for-delivery; delivery needs
-recorded delivery details. Owners/managers can step back one stage. Delivering with an outstanding balance is
-allowed after an explicit confirmation. Ticking checklist items **never** changes the stage.
+Production: `upcoming → production → awaiting_approval → editing → out_for_delivery → delivered`
+(*Waiting for Client Approval* and *Out for Delivery* in the UI).
+
+- **Automatic, server-side.** `advance_event_lifecycle()` runs every minute from `pg_cron`. A *confirmed*, non-archived
+  event moves to `production` when its first session starts and to `awaiting_approval` when its last session ends
+  (cancelled sessions ignored). It compares instants (`timestamptz`), so the studio time zone is already in the stored
+  times. It never touches inquiries, cancelled or archived events, and each transition is applied once
+  (`production_start_applied_at` / `production_end_applied_at`), guarded by the stage it expects and an advisory lock,
+  so ticks cannot overlap or repeat. A manual step back is therefore never undone; changing the session times
+  re-arms the scheduler. Automatic steps are logged as *System* with the scheduled time.
+- **Client approval is explicit.** The event stays in `awaiting_approval` until an owner/manager records approval
+  (when, who, optional note). There is no action that skips it, and nothing delivers an event automatically.
+- **Editing → out for delivery → delivered** are manual. *Out for delivery* needs editing marked complete, and records
+  the time plus an optional delivery link; *Delivered* records the completion time. Stepping back clears the
+  milestone but every transition stays in the activity log.
+- **Two axes.** Booking status (inquiry / confirmed / cancelled) is separate from the production stage.
+- **One definition of "upcoming"** for the dashboard KPI, the featured event and the pipeline: not cancelled, not
+  archived, production not started. `src/lib/dashboard.ts` applies the same two time rules to the rows it has
+  (`effectiveStage`), so a late scheduler tick cannot show an event in the wrong place.
+
+Delivering with an outstanding balance is allowed after an explicit confirmation. Ticking checklist items **never**
+changes the stage.
 
 ## Notifications & reminders
 
@@ -128,6 +146,7 @@ allowed after an explicit confirmation. Ticking checklist items **never** change
               │   unique (session, person, session start)  → a new start time = a new reminder
               ▼
  pg_cron every 5 min → process_due_notifications()        (idempotent: unique dedupe_key)
+ pg_cron every 1 min → advance_event_lifecycle()           (idempotent: stage-guarded, applied once per event)
               │   re-validates each reminder at send time (still confirmed? still assigned? same start?)
               ▼
         notifications (in-app, Realtime)  +  notification_deliveries (e-mail queue)

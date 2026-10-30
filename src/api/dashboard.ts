@@ -8,7 +8,8 @@ export async function getDashboardKpis(studioId: string): Promise<DashboardKpis>
   return {
     ...k,
     active_projects: Number(k.active_projects), inquiries: Number(k.inquiries), upcoming_events: Number(k.upcoming_events),
-    today_events: Number(k.today_events), in_production: Number(k.in_production), pending_delivery: Number(k.pending_delivery),
+    upcoming_next_7_days: Number(k.upcoming_next_7_days), today_events: Number(k.today_events), in_production: Number(k.in_production),
+    ready_for_delivery: Number(k.ready_for_delivery), pending_delivery: Number(k.pending_delivery),
     outstanding_amount: k.outstanding_amount === null ? null : Number(k.outstanding_amount),
   }
 }

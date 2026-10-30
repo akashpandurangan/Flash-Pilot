@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { activeFilterCount, chipFromParams, EVENT_CHIPS, paramsFromChip } from './event-filters'
 
 describe('events status chips', () => {
-  it('offers the seven filters in the requested order', () => {
-    expect(EVENT_CHIPS.map((c) => c.label)).toEqual(['All Events', 'Upcoming', 'In Production', 'Editing', 'Ready for Delivery', 'Delivered', 'Cancelled'])
+  it('offers one filter per lifecycle stage, plus all and cancelled, in order', () => {
+    expect(EVENT_CHIPS.map((c) => c.label)).toEqual(['All Events', 'Upcoming', 'In Production', 'Waiting for Approval', 'Editing', 'Out for Delivery', 'Delivered', 'Cancelled'])
   })
 
   it('round-trips every chip through the URL parameters', () => {
@@ -21,7 +21,8 @@ describe('events status chips', () => {
   it('maps chips to the filters the API understands', () => {
     expect(paramsFromChip('all')).toEqual({ booking: '', stage: '' })
     expect(paramsFromChip('cancelled')).toEqual({ booking: 'cancelled', stage: '' })
-    expect(paramsFromChip('ready_for_delivery')).toEqual({ booking: '', stage: 'ready_for_delivery' })
+    expect(paramsFromChip('out_for_delivery')).toEqual({ booking: '', stage: 'out_for_delivery' })
+    expect(paramsFromChip('awaiting_approval')).toEqual({ booking: '', stage: 'awaiting_approval' })
   })
 
   it('counts only the extra filters, not the status chip', () => {

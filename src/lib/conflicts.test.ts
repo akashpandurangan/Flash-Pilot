@@ -111,7 +111,7 @@ describe('action required', () => {
   it('collects unstaffed, unpaid, overdue and conflict items, most urgent first', () => {
     const items = buildActionItems({
       events: [ev('a', 9, 13, { assignments: [] }), ev('b', 9, 13, { venueName: '' })],
-      projects: [project('p-a'), project('p-b', { editing_due_date: '2029-12-01' }), project('p-c', { delivery_due_date: '2029-12-01', production_stage: 'ready_for_delivery' })],
+      projects: [project('p-a'), project('p-b', { editing_due_date: '2029-12-01' }), project('p-c', { delivery_due_date: '2029-12-01', production_stage: 'out_for_delivery' })],
       financials: [{ project_id: 'p-a', balance: 5000, payment_due_date: '2029-12-10' }, { project_id: 'p-b', balance: 0, payment_due_date: null }],
       inventory: [camera], tz: 'Asia/Kolkata', currency: 'INR', now,
     })

@@ -31,7 +31,7 @@ export function BookingBadge({ status }: { status: BookingStatus }) {
 }
 
 export function StageBadge({ stage }: { stage: ProductionStage }) {
-  const tone: Tone = stage === 'delivered' ? 'success' : stage === 'upcoming' ? 'outline' : stage === 'ready_for_delivery' ? 'accent' : 'neutral'
+  const tone: Tone = stage === 'delivered' ? 'success' : stage === 'upcoming' ? 'outline' : stage === 'awaiting_approval' ? 'warning' : stage === 'out_for_delivery' ? 'accent' : 'neutral'
   return <StatusBadge tone={tone}>{PRODUCTION_STAGE_LABELS[stage]}</StatusBadge>
 }
 

@@ -20,6 +20,7 @@ export const ids = {
   p1: 'a0000000-0000-4000-8000-000000000001',
   p2: 'a0000000-0000-4000-8000-000000000002',
   p3: 'a0000000-0000-4000-8000-000000000003',
+  p4: 'a0000000-0000-4000-8000-000000000004',
 }
 
 const studioRow = {
@@ -60,12 +61,14 @@ export function buildDb(role = 'owner') {
     id, studio_id: ids.studio, project_code: code, client_id: client.id, name, event_type: 'wedding', description: 'Three-day celebration in Udaipur.', internal_notes: 'Bride wants candid style.',
     booking_status: booking, production_stage: stage, editor_id: ids.meera, editing_due_date: day(10), delivery_due_date: day(25), confirmed_at: iso(-20 * D), cancelled_at: null, cancel_reason: null,
     production_started_at: null, shoot_completed_at: null, editing_started_at: null, editing_completed_at: null, ready_for_delivery_at: null, delivered_at: null, archived_at: null,
+    client_approved_at: null, client_approved_by_name: null, client_approval_note: null, production_start_applied_at: null, production_end_applied_at: null,
     created_at: iso(-25 * D), updated_at: iso(-1 * D), ...extra,
   })
   const projects = [
-    proj(ids.p1, 'FP-0001', 'Sharma–Rao Wedding', clients[0], 'confirmed', 'editing', { production_started_at: iso(-6 * D), shoot_completed_at: iso(-5 * D), editing_started_at: iso(-4 * D), editing_due_date: day(-1) }),
+    proj(ids.p1, 'FP-0001', 'Sharma–Rao Wedding', clients[0], 'confirmed', 'editing', { production_started_at: iso(-6 * D), shoot_completed_at: iso(-5 * D), editing_started_at: iso(-4 * D), editing_due_date: day(-1), client_approved_at: iso(-4 * D), client_approved_by_name: 'Olivia Mehra', client_approval_note: 'Approved the selection on WhatsApp', production_start_applied_at: iso(-6 * D), production_end_applied_at: iso(-5 * D) }),
     proj(ids.p2, 'FP-0002', 'Mehta Corporate Launch', clients[1], 'confirmed', 'upcoming', { event_type: 'corporate', editing_due_date: null, delivery_due_date: null, editor_id: null }),
     proj(ids.p3, 'FP-0003', 'Nair Maternity Shoot', clients[2], 'inquiry', 'upcoming', { event_type: 'maternity', confirmed_at: null, editor_id: null }),
+    proj(ids.p4, 'FP-0004', 'Kapoor Engagement Shoot', clients[0], 'confirmed', 'awaiting_approval', { event_type: 'engagement', editor_id: ids.meera, production_started_at: iso(-3 * D), shoot_completed_at: iso(-3 * D + 4 * H), production_start_applied_at: iso(-3 * D), production_end_applied_at: iso(-3 * D + 4 * H) }),
   ]
 
   const events = [
@@ -74,6 +77,7 @@ export function buildDb(role = 'owner') {
     { id: 'b0000000-0000-4000-8000-000000000003', studio_id: ids.studio, project_id: ids.p2, title: 'Product launch', event_type: 'corporate', starts_at: iso(1 * D + 3 * H), ends_at: iso(1 * D + 9 * H), venue_name: 'Jio World Centre', venue_address: 'BKC, Mumbai', map_url: null, notes: null, sort_order: 0, cancelled_at: null },
     { id: 'b0000000-0000-4000-8000-000000000004', studio_id: ids.studio, project_id: ids.p2, title: 'After-party', event_type: 'other', starts_at: iso(1 * D + 4 * H), ends_at: iso(1 * D + 8 * H), venue_name: null, venue_address: null, map_url: null, notes: null, sort_order: 1, cancelled_at: null },
     { id: 'b0000000-0000-4000-8000-000000000005', studio_id: ids.studio, project_id: ids.p3, title: 'Maternity session', event_type: 'maternity', starts_at: iso(9 * D), ends_at: iso(9 * D + 3 * H), venue_name: 'Studio A', venue_address: 'Lumen Studio', map_url: null, notes: null, sort_order: 0, cancelled_at: null },
+    { id: 'b0000000-0000-4000-8000-000000000006', studio_id: ids.studio, project_id: ids.p4, title: 'Engagement shoot', event_type: 'engagement', starts_at: iso(-3 * D), ends_at: iso(-3 * D + 4 * H), venue_name: 'Marine Drive', venue_address: 'Mumbai', map_url: null, notes: null, sort_order: 0, cancelled_at: null },
   ].map((e) => {
     const withTeam = {
       'b0000000-0000-4000-8000-000000000001': [asg(e.id, employees[1], 'lead_photographer'), asg(e.id, employees[2], 'videographer')],
@@ -81,6 +85,7 @@ export function buildDb(role = 'owner') {
       'b0000000-0000-4000-8000-000000000003': [asg(e.id, employees[1], 'lead_photographer')],
       'b0000000-0000-4000-8000-000000000004': [asg(e.id, employees[1], 'second_photographer')], // double-booked with Riya on the launch
       'b0000000-0000-4000-8000-000000000005': [],
+      'b0000000-0000-4000-8000-000000000006': [asg(e.id, employees[1], 'lead_photographer')],
     }[e.id]
     const withGear = e.id.endsWith('3') || e.id.endsWith('4') ? [gear(e.id, 0)] : e.id.endsWith('2') ? [gear(e.id, 0), gear(e.id, 2, 2)] : []
     return { ...e, event_assignments: withTeam, event_equipment: withGear }
@@ -99,6 +104,7 @@ export function buildDb(role = 'owner') {
     { project_id: ids.p1, studio_id: ids.studio, agreed_amount: 250000, payment_due_date: day(-3), paid_amount: 100000, balance: 150000 },
     { project_id: ids.p2, studio_id: ids.studio, agreed_amount: 80000, payment_due_date: day(14), paid_amount: 80000, balance: 0 },
     { project_id: ids.p3, studio_id: ids.studio, agreed_amount: 0, payment_due_date: null, paid_amount: 0, balance: 0 },
+    { project_id: ids.p4, studio_id: ids.studio, agreed_amount: 60000, payment_due_date: day(20), paid_amount: 60000, balance: 0 },
   ]
   const payments = [
     { id: 'd0000000-0000-4000-8000-000000000001', studio_id: ids.studio, project_id: ids.p1, amount: 100000, paid_on: day(-20), method: 'upi', reference: 'UTR1234567', notes: null, is_advance: true, status: 'valid', voided_at: null, void_reason: null, recorded_by_name: 'Olivia Mehra', created_at: iso(-20 * D), project: { id: ids.p1, name: 'Sharma–Rao Wedding', project_code: 'FP-0001' } },
@@ -108,7 +114,7 @@ export function buildDb(role = 'owner') {
     ['Team confirmed', 'preparation', true], ['Shoot completed', 'shoot', true], ['Editing completed', 'editing', false], ['Delivery completed', 'delivery', false],
   ].map(([title, phase, done], i) => ({ id: `${pid}-t${i}`, project_id: pid, studio_id: ids.studio, title, phase, sort_order: i * 10, assignee_id: null, is_done: done, done_at: done ? iso(-3 * D) : null, done_by_name: done ? 'Olivia Mehra' : null }))
   const activity = [
-    { id: 'l1', studio_id: ids.studio, project_id: ids.p1, entity_type: 'project', action: 'workflow_start_editing', summary: 'Moved into editing', category: 'general', actor_name: 'Olivia Mehra', metadata: {}, created_at: iso(-4 * D), project: { name: 'Sharma–Rao Wedding' } },
+    { id: 'l1', studio_id: ids.studio, project_id: ids.p1, entity_type: 'project', action: 'workflow_approve_client', summary: 'Client approval recorded - editing started', category: 'general', actor_name: 'Olivia Mehra', metadata: {}, created_at: iso(-4 * D), project: { name: 'Sharma–Rao Wedding' } },
     { id: 'l2', studio_id: ids.studio, project_id: ids.p1, entity_type: 'payment', action: 'advance_recorded', summary: 'Advance payment recorded', category: 'financial', actor_name: 'Olivia Mehra', metadata: { amount: 100000 }, created_at: iso(-20 * D), project: { name: 'Sharma–Rao Wedding' } },
     { id: 'l3', studio_id: ids.studio, project_id: ids.p2, entity_type: 'project', action: 'project_created', summary: 'Project created: Mehta Corporate Launch', category: 'general', actor_name: 'Olivia Mehra', metadata: {}, created_at: iso(-2 * D), project: { name: 'Mehta Corporate Launch' } },
   ]
@@ -116,7 +122,7 @@ export function buildDb(role = 'owner') {
     { id: 'n1', studio_id: ids.studio, recipient_employee_id: meId, type: 'event_reminder', title: 'Reminder: Product launch - Mehta Corporate Launch', body: 'Project: Mehta Corporate Launch (FP-0002)\nEvent: Product launch\nReporting time: Tomorrow, 11:00 AM Asia/Kolkata\nVenue: Jio World Centre, BKC, Mumbai\nYour role: Lead Photographer', link: `/projects/${ids.p2}`, project_id: ids.p2, event_id: null, read_at: null, created_at: iso(-1 * H), show_in_app: true },
     { id: 'n2', studio_id: ids.studio, recipient_employee_id: meId, type: 'editing_overdue', title: 'Editing overdue: Sharma–Rao Wedding', body: 'Editing was due yesterday.', link: `/projects/${ids.p1}`, project_id: ids.p1, event_id: null, read_at: iso(-2 * H), created_at: iso(-5 * H), show_in_app: true },
   ]
-  const kpis = { active_projects: 2, inquiries: 1, upcoming_events: 3, today_events: 0, in_production: 0, pending_delivery: 1, outstanding_amount: role === 'owner' ? 150000 : null, stage_counts: { upcoming: 1, editing: 1 } }
+  const kpis = { active_projects: 3, inquiries: 1, upcoming_events: 2, upcoming_next_7_days: 1, today_events: 0, in_production: 0, ready_for_delivery: 0, pending_delivery: 1, outstanding_amount: role === 'owner' ? 150000 : null, stage_counts: { upcoming: 2, awaiting_approval: 1, editing: 1 } }
   const deliveries = [
     { id: 'dl1', notification_id: 'n1', studio_id: ids.studio, channel: 'email', to_address: 'riya@lumen.studio', status: 'skipped', attempts: 1, max_attempts: 5, last_error: 'Email provider not configured (set RESEND_API_KEY and EMAIL_FROM).', sent_at: null, created_at: iso(-1 * H), notification: { title: 'Reminder: Product launch', type: 'event_reminder' } },
   ]
@@ -162,6 +168,17 @@ export async function installFakeSupabase(context, role = 'owner', log = []) {
       log.push(`RPC ${rpc[1]}`)
       const body = req.postDataJSON?.() ?? {}
       if (rpc[1] === 'dashboard_kpis') return reply(route, db.kpis)
+      if (rpc[1] === 'project_workflow_action') {
+        // just enough of the state machine to drive the UI through the approval flow
+        const next = { approve_client: 'editing', mark_out_for_delivery: 'out_for_delivery', mark_delivered: 'delivered' }[body.p_action]
+        const patch = {
+          approve_client: { client_approved_at: iso(0), client_approved_by_name: 'Olivia Mehra', client_approval_note: body.p_note ?? null, editing_started_at: iso(0) },
+          mark_out_for_delivery: { ready_for_delivery_at: iso(0) }, mark_delivered: { delivered_at: iso(0) },
+        }[body.p_action]
+        if (!next) return reply(route, { message: `unknown_action: ${body.p_action}` }, { status: 400 })
+        for (const row of [db.projects.find((p) => p.id === body.p_project_id), db.overview.find((p) => p.id === body.p_project_id)]) Object.assign(row, { production_stage: next, ...patch })
+        return reply(route, db.projects.find((p) => p.id === body.p_project_id))
+      }
       if (rpc[1] === 'create_studio') { state.created = true; state.step = 2; db.studio.name = body.p_name; return reply(route, ids.studio) }
       if (rpc[1] === 'save_onboarding_step') { state.step = Math.max(state.step, body.p_step); return reply(route, null) }
       if (rpc[1] === 'complete_onboarding') { state.completed = true; state.step = 4; return reply(route, null) }

@@ -1,7 +1,8 @@
 import type { ActionItem } from './alerts'
 import { countAttentionEvents } from './alerts'
-import { PRODUCTION_STAGES, PRODUCTION_STAGE_LABELS } from './constants'
-import type { ProductionStage, ProjectOverview } from '@/types/entities'
+import { PRODUCTION_STAGES, PRODUCTION_STAGE_LABELS, PRODUCTION_STAGE_SHORT_LABELS } from './constants'
+import { todayKey, zonedDayKey } from './time'
+import type { BookingStatus, ProductionStage, ProjectOverview } from '@/types/entities'
 
 /**
  * Everything the dashboard shows is derived from real rows by the functions below - nothing is
@@ -12,60 +13,100 @@ export type EventLite = Pick<
   ProjectOverview,
   | 'id' | 'name' | 'project_code' | 'client_name' | 'event_type' | 'booking_status' | 'production_stage' | 'archived_at' | 'next_event_at'
   | 'first_event_at' | 'last_event_at' | 'event_count' | 'assigned_employee_ids' | 'shoot_completed_at' | 'editing_completed_at'
-  | 'editing_due_date' | 'delivery_due_date'
+  | 'editing_due_date' | 'delivery_due_date' | 'production_start_applied_at' | 'production_end_applied_at'
 >
 
 const DAY = 86_400_000
-const live = (e: EventLite) => !e.archived_at && e.booking_status !== 'cancelled'
+/** Counts toward the dashboard: in this studio's list, not archived, not cancelled. */
+export const isLive = (e: Pick<EventLite, 'archived_at' | 'booking_status'>) => !e.archived_at && e.booking_status !== 'cancelled'
 
 /**
- * The event to feature: the one whose next session comes soonest (confirmed bookings win ties).
- * With nothing upcoming it falls back to the most recently scheduled event that is still in production.
+ * The stage an event is really in right now. The server job (advance_event_lifecycle) moves confirmed
+ * events on at their scheduled start and end; this applies the same two rules to the row we have, so a
+ * late tick - or the job not being scheduled yet - never leaves an event in the wrong bucket. It respects
+ * the job's own "already applied" markers, so a manual step back is honoured here exactly as on the server.
+ * Inquiries and cancelled events never advance.
  */
-export function pickFeaturedEvent(events: EventLite[], now: Date = new Date()): EventLite | null {
+export function effectiveStage(e: EventLite, now: Date = new Date()): ProductionStage {
+  if (e.booking_status !== 'confirmed' || e.archived_at) return e.production_stage
   const t = now.getTime()
-  const upcoming = events
-    .filter((e) => live(e) && e.next_event_at && new Date(e.next_event_at).getTime() >= t)
-    .sort((a, b) =>
-      new Date(a.next_event_at!).getTime() - new Date(b.next_event_at!).getTime() ||
-      Number(b.booking_status === 'confirmed') - Number(a.booking_status === 'confirmed'))
-  if (upcoming[0]) return upcoming[0]
+  let stage = e.production_stage
+  if (stage === 'upcoming' && !e.production_start_applied_at && e.first_event_at && new Date(e.first_event_at).getTime() <= t) stage = 'production'
+  if (stage === 'production' && !e.production_end_applied_at && e.last_event_at && new Date(e.last_event_at).getTime() <= t) stage = 'awaiting_approval'
+  return stage
+}
 
-  const inFlight = events
-    .filter((e) => live(e) && e.booking_status === 'confirmed' && e.production_stage !== 'delivered' && e.production_stage !== 'upcoming')
-    .sort((a, b) => new Date(b.last_event_at ?? 0).getTime() - new Date(a.last_event_at ?? 0).getTime())
-  return inFlight[0] ?? null
+/**
+ * THE definition of an upcoming event, used by the KPI, the featured card and the pipeline alike:
+ * in this studio, not cancelled or archived, and production has not started (so it has not finished either).
+ */
+export const isUpcoming = (e: EventLite, now: Date = new Date()) => isLive(e) && effectiveStage(e, now) === 'upcoming'
+
+/** Upcoming events, nearest first. Anything whose date has already slipped past (stepped back by hand) goes last. */
+export function upcomingEvents(events: EventLite[], now: Date = new Date()): EventLite[] {
+  const t = now.getTime()
+  const start = (e: EventLite) => (e.first_event_at ? new Date(e.first_event_at).getTime() : Number.MAX_SAFE_INTEGER)
+  return events
+    .filter((e) => isUpcoming(e, now))
+    .sort((a, b) => {
+      const aLate = start(a) < t
+      const bLate = start(b) < t
+      if (aLate !== bLate) return aLate ? 1 : -1
+      return start(a) - start(b) || Number(b.booking_status === 'confirmed') - Number(a.booking_status === 'confirmed')
+    })
+}
+
+/** The event to feature: the nearest upcoming one (confirmed bookings win ties). Null only when there is genuinely none. */
+export function pickFeaturedEvent(events: EventLite[], now: Date = new Date()): EventLite | null {
+  return upcomingEvents(events, now)[0] ?? null
+}
+
+export interface TodaySession {
+  starts_at: string
+  project: { id: string; booking_status: BookingStatus; archived_at: string | null }
+}
+
+/** Events with a session starting today in the studio's time zone, and how many sessions that is. */
+export function todaysEvents(sessions: TodaySession[], tz: string, now: Date = new Date()): { events: number; sessions: number } {
+  const today = todayKey(tz, now)
+  const todays = sessions.filter((s) => isLive(s.project) && zonedDayKey(s.starts_at, tz) === today)
+  return { events: new Set(todays.map((s) => s.project.id)).size, sessions: todays.length }
 }
 
 export interface EventKpis {
-  /** Confirmed events with a session still to come. */
+  /** All upcoming events - not limited to the next week. */
   upcoming: number
-  /** ...of which the next session is within 7 days. */
+  /** ...of which start within 7 days. */
   upcomingNext7: number
-  inProduction: number
-  editing: number
-  /** Shoot finished, editing not started yet. */
-  awaitingEditing: number
+  /** Events at the Out for Delivery stage (the final hand-over step before Delivered). */
+  readyForDelivery: number
   needsAttention: number
 }
 
 export function computeEventKpis(events: EventLite[], attention: ActionItem[], now: Date = new Date()): EventKpis {
   const t = now.getTime()
-  const confirmed = events.filter((e) => live(e) && e.booking_status === 'confirmed')
-  const upcoming = confirmed.filter((e) => e.next_event_at && new Date(e.next_event_at).getTime() >= t)
+  const upcoming = events.filter((e) => isUpcoming(e, now))
   return {
     upcoming: upcoming.length,
-    upcomingNext7: upcoming.filter((e) => new Date(e.next_event_at!).getTime() - t <= 7 * DAY).length,
-    inProduction: confirmed.filter((e) => e.production_stage === 'production').length,
-    editing: confirmed.filter((e) => e.production_stage === 'editing').length,
-    awaitingEditing: confirmed.filter((e) => e.production_stage === 'production' && !!e.shoot_completed_at).length,
+    upcomingNext7: upcoming.filter((e) => e.first_event_at && new Date(e.first_event_at).getTime() - t <= 7 * DAY).length,
+    readyForDelivery: events.filter((e) => isLive(e) && e.booking_status === 'confirmed' && effectiveStage(e, now) === 'out_for_delivery').length,
     needsAttention: countAttentionEvents(attention),
   }
 }
 
+/** Live events per stage - what the pipeline shows, built from the same rows and rules as the KPIs. */
+export function pipelineCounts(events: EventLite[], now: Date = new Date()): Record<ProductionStage, number> {
+  const counts = Object.fromEntries(PRODUCTION_STAGES.map((s) => [s, 0])) as Record<ProductionStage, number>
+  for (const e of events) if (isLive(e)) counts[effectiveStage(e, now)] += 1
+  return counts
+}
+
 export interface PipelineSegment {
   stage: ProductionStage
+  /** Short name for the compact bar. */
   label: string
+  /** Full stage name, for tooltips and screen readers. */
+  fullLabel: string
   count: number
   /** 0–1 share of all events in the pipeline. */
   share: number
@@ -75,7 +116,7 @@ export function pipelineSegments(counts: Partial<Record<ProductionStage, number>
   const total = PRODUCTION_STAGES.reduce((sum, s) => sum + Number(counts[s] ?? 0), 0)
   return PRODUCTION_STAGES.map((stage) => {
     const count = Number(counts[stage] ?? 0)
-    return { stage, label: PRODUCTION_STAGE_LABELS[stage], count, share: total === 0 ? 0 : count / total }
+    return { stage, label: PRODUCTION_STAGE_SHORT_LABELS[stage], fullLabel: PRODUCTION_STAGE_LABELS[stage], count, share: total === 0 ? 0 : count / total }
   })
 }
 
@@ -138,12 +179,16 @@ export function buildInsights(items: ActionItem[], events: EventLite[], now: Dat
   if (lateEditing) out.push({ id: 'editing-late', tone: 'risk', count: lateEditing, href: '/events?stage=editing', text: `${plural(lateEditing, 'editing job is', 'editing jobs are')} overdue` })
 
   const lateDelivery = distinct((i) => i.kind === 'overdue_delivery')
-  if (lateDelivery) out.push({ id: 'delivery-late', tone: 'risk', count: lateDelivery, href: '/events?stage=ready_for_delivery', text: `${plural(lateDelivery, 'delivery is', 'deliveries are')} overdue` })
+  if (lateDelivery) out.push({ id: 'delivery-late', tone: 'risk', count: lateDelivery, href: '/events?stage=out_for_delivery', text: `${plural(lateDelivery, 'delivery is', 'deliveries are')} overdue` })
 
   const latePayments = distinct((i) => i.kind === 'unpaid' && i.severity === 'high')
   if (latePayments) out.push({ id: 'payments-late', tone: 'risk', count: latePayments, href: '/payments', text: `${plural(latePayments, 'payment is', 'payments are')} overdue` })
 
-  const pendingEditing = events.filter((e) => live(e) && e.booking_status === 'confirmed' && (e.production_stage === 'editing' || (e.production_stage === 'production' && !!e.shoot_completed_at))).length
+  const live = events.filter((e) => isLive(e) && e.booking_status === 'confirmed')
+  const waiting = live.filter((e) => effectiveStage(e, now) === 'awaiting_approval').length
+  if (waiting) out.push({ id: 'approval', tone: 'caution', count: waiting, href: '/events?stage=awaiting_approval', text: `${waiting} ${waiting === 1 ? 'event is' : 'events are'} waiting for client approval` })
+
+  const pendingEditing = live.filter((e) => effectiveStage(e, now) === 'editing').length
   if (pendingEditing) out.push({ id: 'editing', tone: 'caution', count: pendingEditing, href: '/events?stage=editing', text: `${pendingEditing} ${pendingEditing === 1 ? 'event has' : 'events have'} pending editing` })
 
   const conflicts = items.filter((i) => i.kind === 'team_conflict' || i.kind === 'equipment_conflict').length

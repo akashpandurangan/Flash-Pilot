@@ -56,10 +56,10 @@ const check = (name, ok, detail = '') => { results.push({ name, ok: !!ok, detail
 async function newSession(role, viewport) {
   const context = await browser.newContext({ viewport, deviceScaleFactor: 1, timezoneId: 'America/New_York' }) // browser tz deliberately != studio tz
   const api = []
-  await installFakeSupabase(context, role, api)
+  const db = await installFakeSupabase(context, role, api)
   const page = await context.newPage()
   watch(page, `${role}@${viewport.width}`)
-  return { context, page, api }
+  return { context, page, api, db }
 }
 
 async function login(page) {
@@ -96,13 +96,24 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await page.getByRole('heading', { level: 1 }).waitFor()
   check('dashboard greets the user', /Good (morning|afternoon|evening), Olivia/.test(await page.getByRole('heading', { level: 1 }).innerText()))
   await page.waitForTimeout(600)
-  const kpiLabels = ['Upcoming events', 'In production', 'Editing in progress', 'Needs attention']
+  const kpiLabels = ['Upcoming events', "Today's events", 'Ready for delivery', 'Needs attention']
   const kpiFound = await Promise.all(kpiLabels.map(async (l) => (await page.getByText(l, { exact: true }).count()) > 0))
   check('dashboard shows the four overview cards', kpiFound.every(Boolean), kpiLabels.filter((_, i) => !kpiFound[i]).join(', '))
   // a card is: <div><p>label</p>…</div><p>value</p>
   const cardValue = async (label) => Number(await page.locator('p', { hasText: new RegExp(`^${label}$`) }).first().locator('xpath=../following-sibling::p[1]').innerText())
   const [upcomingN, attentionN] = [await cardValue('Upcoming events'), await cardValue('Needs attention')]
   check('dashboard overview numbers come from the API (upcoming and attention counts are non-zero)', upcomingN > 0 && attentionN > 0, `upcoming=${upcomingN} attention=${attentionN}`)
+  // one definition of "upcoming" everywhere: the card, the pipeline and the featured event must agree
+  const pipelineUpcoming = Number(/: (\d+) event/.exec(await page.getByRole('link', { name: /^Upcoming: \d+ events?$/ }).getAttribute('aria-label'))?.[1])
+  check('pipeline "Upcoming" matches the Upcoming events card', pipelineUpcoming === upcomingN, `pipeline=${pipelineUpcoming} card=${upcomingN}`)
+  const featuredCard = page.getByRole('article', { name: 'Featured event' })
+  check('featured event shows the nearest upcoming event with client, venue, status and team', (await featuredCard.getByText('Mehta Corporate Launch').count()) > 0 && (await featuredCard.getByText(/Rohan Mehta/).count()) > 0 && (await featuredCard.getByText(/Jio World Centre/).count()) > 0 && (await featuredCard.getByText('Confirmed', { exact: true }).count()) > 0 && (await featuredCard.getByText('Upcoming', { exact: true }).count()) > 0 && (await featuredCard.getByText(/photographer/).count()) > 0)
+  check('no empty "No upcoming events" state while an upcoming event exists', (await page.getByText('No upcoming events').count()) === 0)
+  check('dashboard shows the Today events and Ready for delivery cards, and no "In production" card', (await page.getByText("Today's events", { exact: true }).count()) === 1 && (await page.getByText('Ready for delivery', { exact: true }).count()) === 1 && (await page.getByText('In production', { exact: true }).count()) === 0)
+  check('Upcoming events card links to the filtered Events list', (await page.getByRole('link', { name: /Upcoming events/ }).first().getAttribute('href')) === '/events?stage=upcoming')
+  check('Ready for delivery card links to the Out for Delivery list', (await page.getByRole('link', { name: /Ready for delivery/ }).first().getAttribute('href')) === '/events?stage=out_for_delivery')
+  const sideNav = (await page.getByRole('navigation', { name: 'Main' }).getByRole('link').allInnerTexts()).map((s) => s.replace(/\s+\d+$/, '').trim())
+  check('sidebar has no Production or Deliveries entries', JSON.stringify(sideNav) === JSON.stringify(['Overview', 'Events', 'Calendar', 'Clients', 'Team', 'Equipment', 'Payments', 'Reports']), sideNav.join(', '))
   check('dashboard shows the sidebar section labels', (await page.getByText('Studio management', { exact: false }).count()) > 0 && (await page.getByText('Workspace', { exact: false }).count()) > 0)
   // compact sizing (viewport is 1366x860, so the sidebar is in its normal, not short-screen, form)
   const sizes = await page.evaluate(() => {
@@ -126,6 +137,11 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   check('dashboard shows the unpaid balance as an issue with a clear action', (await page.getByText('Balance payment pending').count()) > 0 && (await page.getByRole('link', { name: /Record payment/ }).count()) > 0)
   check('insights panel says it is rule-based, not AI', (await page.getByText(/not AI-generated/).count()) > 0)
   await shot(page, '02-dashboard')
+  await featuredCard.click({ position: { x: 40, y: 40 } })
+  await page.waitForURL(new RegExp(`/events/${ids.p2}$`))
+  check('clicking the featured event opens that event', new URL(page.url()).pathname === `/events/${ids.p2}`)
+  await page.goto(`${BASE}/`)
+  await page.getByRole('heading', { level: 1 }).waitFor()
 
   const owner = [
     ['/events', '03-projects', 'Sharma–Rao Wedding'],
@@ -193,7 +209,7 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   check('settings links to team access, account and notification preferences', (await page.getByRole('navigation', { name: 'Related settings' }).getByRole('link').count()) === 3)
   await page.goto(`${BASE}/events`)
   await page.getByText('Sharma–Rao Wedding').first().waitFor()
-  for (const chip of ['All Events', 'Upcoming', 'In Production', 'Editing', 'Ready for Delivery', 'Delivered', 'Cancelled']) {
+  for (const chip of ['All Events', 'Upcoming', 'In Production', 'Waiting for Approval', 'Editing', 'Out for Delivery', 'Delivered', 'Cancelled']) {
     if ((await page.getByRole('button', { name: chip, exact: true }).count()) + (await page.getByRole('radio', { name: chip, exact: true }).count()) === 0) check(`events page has the "${chip}" filter`, false)
   }
   check('events page has no "Projects" wording', !/\bProjects?\b/.test(await page.locator('main').innerText()))
@@ -227,6 +243,23 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await page.goto(`${BASE}/events/${ids.p1}?tab=production`)
   await page.getByText('Production checklist').waitFor()
   await shot(page, '21-project-production')
+  check('production tab shows the whole lifecycle and when it advances', (await page.getByRole('list', { name: 'Production progress' }).getByText('Waiting for Client Approval').count()) > 0 && (await page.getByText('Out for Delivery', { exact: true }).count()) > 0)
+
+  // an event waiting for client approval: shown clearly, never advances on its own, and approval is an explicit, recorded action
+  await page.goto(`${BASE}/events/${ids.p4}`)
+  await page.getByRole('heading', { level: 1, name: 'Kapoor Engagement Shoot' }).waitFor()
+  check('event details say the event is waiting for client approval', (await page.getByRole('status').filter({ hasText: 'Waiting for client approval' }).count()) > 0)
+  await page.goto(`${BASE}/events/${ids.p4}?tab=production`)
+  await page.getByText('Production checklist').waitFor()
+  check('production tab shows the approval is pending, with a Record client approval action', (await page.getByText('Client approval - pending').count()) > 0 && (await page.getByRole('button', { name: 'Record client approval' }).count()) === 1)
+  check('no editing or delivery actions are offered before approval', (await page.getByRole('button', { name: /Mark editing completed|Mark out for delivery|Mark delivered/ }).count()) === 0)
+  await page.getByRole('button', { name: 'Record client approval' }).click()
+  await page.getByLabel('How did they approve?').fill('Approved by phone')
+  await shot(page, '21b-approval-dialog')
+  await page.getByRole('button', { name: 'Record approval' }).click()
+  await page.getByRole('button', { name: 'Mark editing completed' }).waitFor()
+  check('recording approval moves the event into editing and keeps who and how', (await page.getByText('Client approved', { exact: true }).count()) > 0 && (await page.getByText(/Recorded by Olivia Mehra/).count()) > 0)
+  await shot(page, '21c-after-approval')
   await page.goto(`${BASE}/events/${ids.p1}?tab=payments`)
   await page.getByText('Payment history').waitFor()
   await shot(page, '22-project-payments')
@@ -237,7 +270,7 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await shot(page, '23-payment-overpay')
   await page.keyboard.press('Escape')
   await page.goto(`${BASE}/events/${ids.p1}?tab=activity`)
-  await page.getByText('Moved into editing').waitFor()
+  await page.getByText('Client approval recorded - editing started').waitFor()
   check('activity timeline shows who/when', (await page.getByText(/Olivia Mehra ·/).count()) > 0)
 
   // 404
@@ -265,7 +298,7 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await page.getByRole('button', { name: 'Open menu' }).click()
   await page.waitForTimeout(300)
   await shot(page, '31-mobile-nav')
-  check('mobile drawer lists every section for the owner', (await page.getByRole('navigation', { name: 'Main' }).getByRole('link').count()) === 10)
+  check('mobile drawer lists every section for the owner', (await page.getByRole('navigation', { name: 'Main' }).getByRole('link').count()) === 8)
   await page.keyboard.press('Escape')
   for (const [path, name] of [['/events', '32-mobile-projects'], ['/events/new', '33-mobile-project-form'], [`/events/${ids.p1}`, '34-mobile-project-detail'], ['/clients', '35-mobile-clients'], ['/calendar', '36-mobile-calendar'], ['/team', '37-mobile-team'], ['/payments', '38-mobile-payments']]) {
     await page.goto(`${BASE}${path}`)
@@ -304,6 +337,31 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
   await shot(page, '41-tablet-projects')
 }
 
+/* ------------------------------------------- the reported bug: "upcoming" in the database, but already over */
+{
+  const { page, db } = await newSession('owner', { width: 1366, height: 860 })
+  // One confirmed event that is still stored as "upcoming" although all its sessions finished three days ago
+  // (what a studio looks like before the scheduler runs). The dashboard used to say 0 / 1 / "No upcoming events".
+  const H = 3_600_000
+  const base = db.overview.find((p) => p.id === ids.p2)
+  const stale = { ...base, production_stage: 'upcoming', first_event_at: new Date(Date.now() - 72 * H).toISOString(), next_event_at: null, last_event_at: new Date(Date.now() - 66 * H).toISOString() }
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*', 'access-control-expose-headers': 'content-range' }
+  await page.route('**/rest/v1/project_overview*', (route) => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
+    return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json', 'content-range': '0-0/1' }, body: JSON.stringify([stale]) })
+  })
+  await login(page)
+  await page.getByRole('heading', { level: 1 }).waitFor()
+  await page.waitForTimeout(700)
+  const cardValue = async (label) => Number(await page.locator('p', { hasText: new RegExp(`^${label}$`) }).first().locator('xpath=../following-sibling::p[1]').innerText())
+  const pipeline = async (name) => Number(/: (\d+) event/.exec(await page.getByRole('link', { name: new RegExp(`^${name}: \\d+ events?$`) }).getAttribute('aria-label'))?.[1])
+  const upcomingCard = await cardValue('Upcoming events')
+  check('a finished event is not counted as upcoming, and the card, pipeline and featured card agree', upcomingCard === 0 && (await pipeline('Upcoming')) === 0 && (await page.getByRole('article', { name: 'Featured event' }).count()) === 0, `card=${upcomingCard} pipeline=${await pipeline('Upcoming')}`)
+  check('the event shows in the pipeline where it really is: waiting for client approval', (await pipeline('Waiting for Client Approval')) === 1)
+  check('with nothing upcoming the featured area is a compact empty state with a Create event action', (await page.getByText('No upcoming events', { exact: true }).count()) === 1 && (await page.getByText('Create an event and the next one will be featured here.').count()) === 1 && (await page.getByRole('link', { name: 'Create event' }).getAttribute('href')) === '/events/new')
+  await shot(page, '02b-dashboard-nothing-upcoming')
+}
+
 /* ------------------------------------------------------------- photographer role */
 {
   const { page, api } = await newSession('photographer', { width: 1366, height: 860 })
@@ -311,7 +369,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
   await page.getByRole('heading', { level: 1 }).waitFor()
   await page.waitForTimeout(600)
   const nav = await page.getByRole('navigation', { name: 'Main' }).getByRole('link').allInnerTexts()
-  check('photographer sees only Overview, Events, Calendar, Production, Deliveries', JSON.stringify(nav.map((s) => s.replace(/\s+\d+$/, '').trim())) === JSON.stringify(['Overview', 'Events', 'Calendar', 'Production', 'Deliveries']), nav.join(', '))
+  check('photographer sees only Overview, Events, Calendar', JSON.stringify(nav.map((s) => s.replace(/\s+\d+$/, '').trim())) === JSON.stringify(['Overview', 'Events', 'Calendar']), nav.join(', '))
   check('photographer dashboard hides money', (await page.getByText('Outstanding').count()) === 0)
   check('photographer dashboard has no "Needs attention" table or insights', (await page.getByText('Needs attention').count()) === 0 && (await page.getByText(/not AI-generated/).count()) === 0)
   await shot(page, '50-photographer-dashboard')

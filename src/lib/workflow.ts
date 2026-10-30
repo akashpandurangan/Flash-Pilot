@@ -4,40 +4,37 @@ import type { AccessRole, BookingStatus, ProductionStage } from '@/types/entitie
  * Booking status and production stage are two independent concepts.
  *
  *   booking:    inquiry ⇄ confirmed → cancelled → (reopen) inquiry
- *   production: upcoming → production → editing → ready_for_delivery → delivered
+ *   production: upcoming → production → awaiting_approval → editing → out_for_delivery → delivered
  *
- * Inside "production" the shoot-completed milestone must be reached before
- * editing may start; inside "editing" the editing-completed milestone must be
- * reached before the project can be marked ready. These rules are enforced by
- * public.project_workflow_action(); this module mirrors them so the UI can show
- * only valid actions (and explain why one is unavailable).
+ * The first two hand-overs are normally automatic (advance_event_lifecycle() starts production at
+ * the first session's start and ends it at the last session's end); a person can still do either by
+ * hand. Client approval is never assumed: the event waits in `awaiting_approval` until someone
+ * records it. These rules are enforced by public.project_workflow_action(); this module mirrors them
+ * so the UI can show only valid actions (and explain why one is unavailable).
  */
 
 export type WorkflowAction =
   | 'start_production'
   | 'complete_shoot'
-  | 'start_editing'
+  | 'approve_client'
   | 'complete_editing'
-  | 'mark_ready'
+  | 'mark_out_for_delivery'
   | 'mark_delivered'
   | 'revert'
 
 export interface WorkflowSubject {
   booking_status: BookingStatus
   production_stage: ProductionStage
-  shoot_completed_at: string | null
   editing_completed_at: string | null
   archived_at: string | null
-  /** A delivery record with a delivery date exists. */
-  hasDeliveryDetails: boolean
 }
 
 export const WORKFLOW_LABELS: Record<WorkflowAction, { label: string; done: string }> = {
-  start_production: { label: 'Start production', done: 'Production started' },
-  complete_shoot: { label: 'Mark shoot completed', done: 'Shoot marked completed' },
-  start_editing: { label: 'Move to editing', done: 'Moved into editing' },
+  start_production: { label: 'Start production now', done: 'Production started' },
+  complete_shoot: { label: 'End production now', done: 'Production completed - waiting for client approval' },
+  approve_client: { label: 'Record client approval', done: 'Client approval recorded - editing started' },
   complete_editing: { label: 'Mark editing completed', done: 'Editing marked completed' },
-  mark_ready: { label: 'Mark ready for delivery', done: 'Marked ready for delivery' },
+  mark_out_for_delivery: { label: 'Mark out for delivery', done: 'Marked out for delivery' },
   mark_delivered: { label: 'Mark delivered', done: 'Event delivered' },
   revert: { label: 'Step back one stage', done: 'Stage reverted' },
 }
@@ -45,9 +42,9 @@ export const WORKFLOW_LABELS: Record<WorkflowAction, { label: string; done: stri
 const ROLES_FOR: Record<WorkflowAction, AccessRole[]> = {
   start_production: ['owner', 'manager', 'photographer'],
   complete_shoot: ['owner', 'manager', 'photographer'],
-  start_editing: ['owner', 'manager'],
+  approve_client: ['owner', 'manager'],
   complete_editing: ['owner', 'manager', 'editor'],
-  mark_ready: ['owner', 'manager', 'editor'],
+  mark_out_for_delivery: ['owner', 'manager', 'editor'],
   mark_delivered: ['owner', 'manager'],
   revert: ['owner', 'manager'],
 }
@@ -64,32 +61,33 @@ export function checkWorkflowAction(subject: WorkflowSubject, role: AccessRole, 
     case 'start_production':
       return s === 'upcoming' ? { ok: true } : { ok: false, reason: 'Production has already started.' }
     case 'complete_shoot':
-      if (s !== 'production') return { ok: false, reason: 'Start production first.' }
-      return subject.shoot_completed_at ? { ok: false, reason: 'The shoot is already completed.' } : { ok: true }
-    case 'start_editing':
-      if (s !== 'production') return { ok: false, reason: 'Editing starts after production.' }
-      return subject.shoot_completed_at ? { ok: true } : { ok: false, reason: 'Complete the shoot before editing.' }
+      return s === 'production' ? { ok: true } : { ok: false, reason: s === 'upcoming' ? 'Production has not started yet.' : 'Production is already complete.' }
+    case 'approve_client':
+      return s === 'awaiting_approval' ? { ok: true } : { ok: false, reason: 'The event is not waiting for client approval.' }
     case 'complete_editing':
       if (s !== 'editing') return { ok: false, reason: 'Editing is not in progress.' }
       return subject.editing_completed_at ? { ok: false, reason: 'Editing is already completed.' } : { ok: true }
-    case 'mark_ready':
+    case 'mark_out_for_delivery':
       if (s !== 'editing') return { ok: false, reason: 'Editing is not in progress.' }
       return subject.editing_completed_at ? { ok: true } : { ok: false, reason: 'Finish editing first.' }
     case 'mark_delivered':
-      if (s !== 'ready_for_delivery') return { ok: false, reason: 'The event is not ready for delivery.' }
-      return subject.hasDeliveryDetails ? { ok: true } : { ok: false, reason: 'Record the delivery method and date first.' }
+      return s === 'out_for_delivery' ? { ok: true } : { ok: false, reason: 'The event is not out for delivery.' }
     case 'revert':
       return s === 'upcoming' ? { ok: false, reason: 'Nothing to step back from.' } : { ok: true }
   }
 }
 
-/** The one step that naturally comes next, for a prominent button. */
+/**
+ * The one step that naturally comes next, for a prominent button. Production start/end are automatic,
+ * so for those two it is the manual "do it now" override - the page labels it that way.
+ */
 export function nextWorkflowAction(subject: WorkflowSubject): WorkflowAction | null {
   switch (subject.production_stage) {
     case 'upcoming': return 'start_production'
-    case 'production': return subject.shoot_completed_at ? 'start_editing' : 'complete_shoot'
-    case 'editing': return subject.editing_completed_at ? 'mark_ready' : 'complete_editing'
-    case 'ready_for_delivery': return 'mark_delivered'
+    case 'production': return 'complete_shoot'
+    case 'awaiting_approval': return 'approve_client'
+    case 'editing': return subject.editing_completed_at ? 'mark_out_for_delivery' : 'complete_editing'
+    case 'out_for_delivery': return 'mark_delivered'
     case 'delivered': return null
   }
 }

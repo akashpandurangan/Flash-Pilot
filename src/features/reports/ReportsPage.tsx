@@ -95,7 +95,7 @@ export default function ReportsPage() {
   }, [events.data, employees.data])
 
   const outstanding = useMemo(() => confirmed.map((p) => ({ p, fin: finById.get(p.id) })).filter((x): x is { p: ProjectOverview; fin: ProjectFinancials } => !!x.fin && Number(x.fin.balance) > 0).sort((a, b) => Number(b.fin.balance) - Number(a.fin.balance)), [confirmed, finById])
-  const pendingDelivery = useMemo(() => confirmed.filter((p) => p.production_stage === 'editing' || p.production_stage === 'ready_for_delivery' || (p.production_stage === 'production' && p.shoot_completed_at)), [confirmed])
+  const pendingDelivery = useMemo(() => confirmed.filter((p) => p.production_stage === 'awaiting_approval' || p.production_stage === 'editing' || p.production_stage === 'out_for_delivery'), [confirmed])
   const overdue = useMemo(() => confirmed.filter((p) => p.production_stage !== 'delivered' && ((p.editing_due_date && p.editing_due_date < today && !p.editing_completed_at) || (p.delivery_due_date && p.delivery_due_date < today))), [confirmed, today])
 
   const q = projects

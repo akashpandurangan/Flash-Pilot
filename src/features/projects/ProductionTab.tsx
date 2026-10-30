@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Circle, ExternalLink, MoreHorizontal, Pencil, Plus, Trash2, Truck, Undo2 } from 'lucide-react'
+import { CheckCircle2, Circle, ExternalLink, Hourglass, MoreHorizontal, Pencil, Plus, Trash2, Truck, Undo2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { listEmployees } from '@/api/employees'
@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { checkWorkflowAction, nextWorkflowAction, WORKFLOW_LABELS, type WorkflowAction, type WorkflowSubject } from '@/lib/workflow'
 import type { ProductionTask, TaskPhase } from '@/types/entities'
 import { useStudio } from '@/features/studio/StudioProvider'
-import { DeliveryDialog, ProductionPlanDialog, useInvalidateProject } from './ProjectDialogs'
+import { ApprovalDialog, DeliveryDialog, ProductionPlanDialog, useInvalidateProject } from './ProjectDialogs'
 
 const PHASES: TaskPhase[] = ['preparation', 'shoot', 'post', 'editing', 'delivery']
 
@@ -28,11 +28,13 @@ export function ProductionTab({ project, balance }: { project: ProjectDetail; ba
   const canManage = can('projects.manage')
   const [plan, setPlan] = useState(false)
   const [deliveryOpen, setDeliveryOpen] = useState(false)
+  const [outOpen, setOutOpen] = useState(false)
+  const [approvalOpen, setApprovalOpen] = useState(false)
 
   const delivery = useQuery({ queryKey: ['project-delivery', project.id], queryFn: () => getDelivery(project.id) })
   const activity = useQuery({ queryKey: ['project-activity', project.id], queryFn: () => listProjectActivity(project.id, 100) })
 
-  const subject: WorkflowSubject = { ...project, hasDeliveryDetails: !!delivery.data?.delivered_on }
+  const subject: WorkflowSubject = project
   const invalidate = useInvalidateProject()
   const run = useMutation({
     mutationFn: (action: WorkflowAction) => runWorkflowAction(project.id, action),
@@ -40,58 +42,89 @@ export function ProductionTab({ project, balance }: { project: ProjectDetail; ba
     onError: (e) => toast.error(errorMessage(e)),
   })
 
+  const stage = project.production_stage
+  const confirmed = project.booking_status === 'confirmed'
   const next = nextWorkflowAction(subject)
   const check = next ? checkWorkflowAction(subject, role, next) : null
   const stepBack = checkWorkflowAction(subject, role, 'revert')
   const who = (action: string) => activity.data?.find((a) => a.action === `workflow_${action}`)?.actor_name
 
-  const milestones: { label: string; at: string | null; action: string }[] = [
+  const sessions = project.project_events.filter((s) => !s.cancelled_at)
+  const firstStart = sessions[0]?.starts_at
+  const lastEnd = sessions.reduce<string | null>((latest, s) => (!latest || s.ends_at > latest ? s.ends_at : latest), null)
+
+  // production starts and ends by itself - say when, so nobody wonders why nothing is happening
+  const automatic =
+    stage === 'upcoming' && firstStart ? `Production starts automatically at ${fmtDateTime(firstStart, tz)}.`
+    : stage === 'production' && lastEnd ? `Production ends automatically at ${fmtDateTime(lastEnd, tz)}, then the event waits for the client's approval.`
+    : null
+
+  const milestones: { label: string; at: string | null; action: string; detail?: string | null }[] = [
     { label: 'Production started', at: project.production_started_at, action: 'start_production' },
-    { label: 'Shoot completed', at: project.shoot_completed_at, action: 'complete_shoot' },
-    { label: 'Editing started', at: project.editing_started_at, action: 'start_editing' },
+    { label: 'Production completed', at: project.shoot_completed_at, action: 'complete_shoot' },
+    {
+      label: 'Client approved', at: project.client_approved_at, action: 'approve_client',
+      detail: project.client_approved_at ? [project.client_approved_by_name && `Recorded by ${project.client_approved_by_name}`, project.client_approval_note].filter(Boolean).join(' · ') : null,
+    },
     { label: 'Editing completed', at: project.editing_completed_at, action: 'complete_editing' },
-    { label: 'Ready for delivery', at: project.ready_for_delivery_at, action: 'mark_ready' },
+    { label: 'Out for delivery', at: project.ready_for_delivery_at, action: 'mark_out_for_delivery' },
     { label: 'Delivered', at: project.delivered_at, action: 'mark_delivered' },
   ]
 
-  const primary = next && (
-    <Button
-      size="lg"
-      className="w-full sm:w-auto"
-      disabled={!check?.ok}
-      loading={run.isPending && run.variables === next}
-      onClick={() => run.mutate(next)}
-    >
-      {WORKFLOW_LABELS[next].label}
-    </Button>
-  )
+  /** The next step's button. Approval and "out for delivery" collect details first; the rest run straight away. */
+  const primary = (() => {
+    if (!next) return null
+    const manual = next === 'start_production' || next === 'complete_shoot'
+    const label = WORKFLOW_LABELS[next].label
+    const common = { size: 'lg' as const, className: 'w-full sm:w-auto', disabled: !check?.ok, variant: manual ? ('secondary' as const) : ('primary' as const) }
+    if (next === 'approve_client') return <Button {...common} onClick={() => setApprovalOpen(true)}>{label}</Button>
+    if (next === 'mark_out_for_delivery' && canManage) return <Button {...common} onClick={() => setOutOpen(true)}>{label}</Button>
+    if (next === 'mark_delivered' && balance !== null && balance > 0) {
+      return (
+        <ConfirmDialog
+          tone="primary"
+          title="Deliver with an outstanding balance?"
+          description={`${formatMoney(balance, currency)} is still unpaid on this event. You can deliver anyway - the balance stays on record and keeps appearing in Payments.`}
+          confirmLabel="Mark delivered anyway"
+          onConfirm={() => run.mutateAsync('mark_delivered')}
+          trigger={<Button {...common}>{label}</Button>}
+        />
+      )
+    }
+    return <Button {...common} loading={run.isPending && run.variables === next} onClick={() => run.mutate(next)}>{label}</Button>
+  })()
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
       <div className="min-w-0 space-y-4">
         <Panel title="Production progress" description="Booking status and production stage are tracked separately.">
-          <StageStepper stage={project.production_stage} className="mb-5" />
-          {project.booking_status !== 'confirmed' && <Notice tone="info" className="mb-4">{project.booking_status === 'inquiry' ? 'Confirm the booking to start tracking production.' : 'This booking is cancelled, so production is frozen.'}</Notice>}
-          {project.production_stage === 'delivered' ? (
+          <StageStepper stage={stage} className="mb-5" />
+          {!confirmed && <Notice tone="info" className="mb-4">{project.booking_status === 'inquiry' ? 'Confirm the booking to start tracking production.' : 'This booking is cancelled, so production is frozen.'}</Notice>}
+
+          {confirmed && stage === 'awaiting_approval' && (
+            <Notice tone="warning" title="Waiting for client approval" className="mb-4">
+              Production finished {project.shoot_completed_at ? fmtDateTime(project.shoot_completed_at, tz) : 'and'} - editing starts only once the client approves.
+              {can('projects.manage') ? ' Record the approval below when you have it.' : ' The studio owner or a manager records the approval.'}
+            </Notice>
+          )}
+          {confirmed && stage === 'out_for_delivery' && (
+            <Notice tone="info" title="Out for delivery" className="mb-4">
+              Sent {project.ready_for_delivery_at ? fmtDateTime(project.ready_for_delivery_at, tz) : ''}. Mark it delivered once the client has received everything.
+            </Notice>
+          )}
+
+          {stage === 'delivered' ? (
             <Notice tone="success" title="Delivered">Delivered {project.delivered_at ? fmtDateTime(project.delivered_at, tz) : ''}. Nothing left to do.</Notice>
-          ) : next ? (
+          ) : confirmed && next ? (
             <div className="space-y-2">
+              {automatic && <p className="text-[13px] text-ink-muted">{automatic}</p>}
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                {next === 'mark_delivered' && balance !== null && balance > 0 ? (
-                  <ConfirmDialog
-                    tone="primary"
-                    title="Deliver with an outstanding balance?"
-                    description={`${formatMoney(balance, currency)} is still unpaid on this event. You can deliver anyway - the balance stays on record and keeps appearing in Payments.`}
-                    confirmLabel="Mark delivered anyway"
-                    onConfirm={() => run.mutateAsync('mark_delivered')}
-                    trigger={<Button size="lg" className="w-full sm:w-auto" disabled={!check?.ok}>{WORKFLOW_LABELS.mark_delivered.label}</Button>}
-                  />
-                ) : primary}
+                {primary}
                 {stepBack.ok && (
                   <ConfirmDialog
                     tone="primary"
                     title="Step back one stage?"
-                    description="The latest milestone is cleared and the event returns to the previous stage. The history stays in the activity log."
+                    description="The latest milestone is cleared and the event returns to the previous stage. The history stays in the activity log, and the automatic schedule will not undo it."
                     confirmLabel="Step back"
                     onConfirm={() => run.mutateAsync('revert')}
                     trigger={<Button variant="ghost"><Undo2 className="size-4" /> Step back</Button>}
@@ -101,12 +134,12 @@ export function ProductionTab({ project, balance }: { project: ProjectDetail; ba
               {check && !check.ok && <p className="text-[13px] text-ink-muted">{check.reason}</p>}
             </div>
           ) : null}
-          {project.production_stage === 'delivered' && stepBack.ok && (
+          {stage === 'delivered' && stepBack.ok && (
             <div className="mt-3">
               <ConfirmDialog
                 tone="primary"
                 title="Reopen this delivery?"
-                description="The event returns to “Ready for delivery” and the delivery confirmation is cleared."
+                description="The event returns to “Out for delivery” and the delivery confirmation is cleared. The earlier delivery stays in the activity log."
                 confirmLabel="Reopen"
                 onConfirm={() => run.mutateAsync('revert')}
                 trigger={<Button variant="secondary" size="sm"><Undo2 className="size-3.5" /> Reopen</Button>}
@@ -114,17 +147,20 @@ export function ProductionTab({ project, balance }: { project: ProjectDetail; ba
             </div>
           )}
 
-          {/* intermediate steps that are available but not "next": e.g. shoot completed while in production */}
           <ol className="mt-6 space-y-2.5 border-t border-line pt-4">
-            {milestones.map((m) => (
-              <li key={m.action} className="flex items-start gap-2.5 text-sm">
-                {m.at ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden /> : <Circle className="mt-0.5 size-4 shrink-0 text-line-strong" aria-hidden />}
-                <div className="min-w-0">
-                  <p className={cn(!m.at && 'text-ink-muted')}>{m.label}</p>
-                  {m.at && <p className="text-xs text-ink-muted">{fmtDateTime(m.at, tz)}{who(m.action) ? ` · ${who(m.action)}` : ''}</p>}
-                </div>
-              </li>
-            ))}
+            {milestones.map((m) => {
+              const pending = !m.at && m.action === 'approve_client' && stage === 'awaiting_approval'
+              return (
+                <li key={m.action} className="flex items-start gap-2.5 text-sm">
+                  {m.at ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden /> : pending ? <Hourglass className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden /> : <Circle className="mt-0.5 size-4 shrink-0 text-line-strong" aria-hidden />}
+                  <div className="min-w-0">
+                    <p className={cn(!m.at && !pending && 'text-ink-muted')}>{pending ? 'Client approval - pending' : m.label}</p>
+                    {m.at && <p className="text-xs text-ink-muted">{fmtDateTime(m.at, tz)}{m.action !== 'approve_client' && who(m.action) ? ` · ${who(m.action)}` : ''}</p>}
+                    {m.detail && <p className="text-xs text-ink-muted">{m.detail}</p>}
+                  </div>
+                </li>
+              )
+            })}
           </ol>
         </Panel>
 
@@ -145,26 +181,34 @@ export function ProductionTab({ project, balance }: { project: ProjectDetail; ba
 
         <Panel
           title="Delivery"
-          action={canManage && project.booking_status === 'confirmed' && <Button variant="secondary" size="sm" onClick={() => setDeliveryOpen(true)}>{delivery.data ? <><Pencil className="size-3.5" /> Edit</> : <><Truck className="size-3.5" /> Record</>}</Button>}
+          action={canManage && project.booking_status === 'confirmed' && <Button variant="secondary" size="sm" onClick={() => setDeliveryOpen(true)}>{delivery.data ? <><Pencil className="size-3.5" /> Edit</> : <><Truck className="size-3.5" /> Add link</>}</Button>}
         >
-          {delivery.isLoading ? <Skeleton className="h-20 w-full" /> : delivery.isError ? <ErrorState error={delivery.error} onRetry={() => void delivery.refetch()} /> : delivery.data ? (
+          {delivery.isLoading ? <Skeleton className="h-20 w-full" /> : delivery.isError ? <ErrorState error={delivery.error} onRetry={() => void delivery.refetch()} /> : (
             <dl className="space-y-3">
-              <Detail label="Method">{DELIVERY_METHOD_LABELS[delivery.data.method]}</Detail>
-              <Detail label="Delivery date">{fmtDateOnly(delivery.data.delivered_on)}</Detail>
-              <Detail label="Link">
-                {delivery.data.link_url && <a href={delivery.data.link_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 break-all underline underline-offset-2">{delivery.data.link_url}<ExternalLink className="size-3 shrink-0" /></a>}
+              <Detail label="Status">
+                {stage === 'delivered' ? <Badge tone="success">Delivered</Badge> : stage === 'out_for_delivery' ? <Badge tone="accent">Out for delivery</Badge> : <Badge tone="outline">Not sent yet</Badge>}
               </Detail>
-              <Detail label="Notes"><span className="whitespace-pre-wrap">{delivery.data.notes}</span></Detail>
-              <Detail label="Confirmation">{delivery.data.confirmed_at ? <Badge tone="success">Delivered {fmtDateTime(delivery.data.confirmed_at, tz)}</Badge> : <Badge tone="outline">Not yet confirmed</Badge>}</Detail>
+              <Detail label="Out for delivery">{project.ready_for_delivery_at && fmtDateTime(project.ready_for_delivery_at, tz)}</Detail>
+              <Detail label="Delivered">{(delivery.data?.confirmed_at ?? project.delivered_at) && fmtDateTime((delivery.data?.confirmed_at ?? project.delivered_at)!, tz)}</Detail>
+              {delivery.data && (
+                <>
+                  <Detail label="Method">{DELIVERY_METHOD_LABELS[delivery.data.method]}</Detail>
+                  <Detail label="Link">
+                    {delivery.data.link_url && <a href={delivery.data.link_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 break-all underline underline-offset-2">{delivery.data.link_url}<ExternalLink className="size-3 shrink-0" /></a>}
+                  </Detail>
+                  <Detail label="Notes"><span className="whitespace-pre-wrap">{delivery.data.notes}</span></Detail>
+                </>
+              )}
+              {!delivery.data && <p className="text-[13px] text-ink-muted">No delivery link yet. Add the gallery or download link here, or when you mark the event out for delivery.</p>}
             </dl>
-          ) : (
-            <p className="text-[13px] text-ink-muted">No delivery recorded yet. Capture the method, date and gallery link before marking the event delivered.</p>
           )}
         </Panel>
       </div>
 
       <ProductionPlanDialog project={project} open={plan} onOpenChange={setPlan} />
       <DeliveryDialog project={project} delivery={delivery.data ?? null} open={deliveryOpen} onOpenChange={setDeliveryOpen} />
+      <DeliveryDialog project={project} delivery={delivery.data ?? null} open={outOpen} onOpenChange={setOutOpen} outForDelivery />
+      <ApprovalDialog project={project} open={approvalOpen} onOpenChange={setApprovalOpen} />
       <span className="sr-only" aria-live="polite">{studio.name}</span>
     </div>
   )

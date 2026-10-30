@@ -3,7 +3,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { listEmployees } from '@/api/employees'
-import { saveDelivery, setBookingStatus, setEventTeam, updateProjectFields } from '@/api/projects'
+import { runWorkflowAction, saveDelivery, setBookingStatus, setEventTeam, updateProjectFields } from '@/api/projects'
 import { updateFinance } from '@/api/payments'
 import { listScheduleEvents } from '@/api/schedule'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,6 @@ import { ASSIGNMENT_ROLE_LABELS, DELIVERY_METHOD_LABELS, TEAM_ROLE_LABELS, optio
 import { overlaps } from '@/lib/conflicts'
 import { errorMessage } from '@/lib/errors'
 import { parseMoneyInput } from '@/lib/money'
-import { todayKey } from '@/lib/time'
 import type { AssignmentRole, DeliveryMethod, ProjectDelivery, ProjectEvent } from '@/types/entities'
 import type { ProjectDetail } from '@/api/projects'
 import { useStudio } from '@/features/studio/StudioProvider'
@@ -183,9 +182,15 @@ export function EventTeamDialog({ event, open, onOpenChange }: { event: ProjectE
 }
 
 /* ---------------------------------------------------------------- delivery */
-export function DeliveryDialog({ project, delivery, open, onOpenChange }: { project: Pick<ProjectDetail, 'id' | 'studio_id'>; delivery: ProjectDelivery | null; open: boolean; onOpenChange: (o: boolean) => void }) {
-  const { tz } = useStudio()
+/**
+ * Delivery details: how and where the client gets the files. With `outForDelivery` it is the
+ * "Mark out for delivery" step: the details are saved and the event moves to Out for Delivery in one go.
+ */
+export function DeliveryDialog({ project, delivery, open, onOpenChange, outForDelivery = false }: {
+  project: Pick<ProjectDetail, 'id' | 'studio_id'>; delivery: ProjectDelivery | null; open: boolean; onOpenChange: (o: boolean) => void; outForDelivery?: boolean
+}) {
   const qc = useQueryClient()
+  const invalidate = useInvalidateProject()
   const [method, setMethod] = useState<DeliveryMethod>('online_gallery')
   const [date, setDate] = useState('')
   const [link, setLink] = useState('')
@@ -194,16 +199,20 @@ export function DeliveryDialog({ project, delivery, open, onOpenChange }: { proj
 
   useEffect(() => {
     if (open) {
-      setMethod(delivery?.method ?? 'online_gallery'); setDate(delivery?.delivered_on ?? todayKey(tz)); setLink(delivery?.link_url ?? ''); setNotes(delivery?.notes ?? ''); setError(null)
+      setMethod(delivery?.method ?? 'online_gallery'); setDate(delivery?.delivered_on ?? ''); setLink(delivery?.link_url ?? ''); setNotes(delivery?.notes ?? ''); setError(null)
     }
-  }, [open, delivery, tz])
+  }, [open, delivery])
 
   const linkBad = link.trim() !== '' && !/^https?:\/\/\S+$/i.test(link.trim())
   const save = useMutation({
-    mutationFn: () => saveDelivery(project.studio_id, project.id, { method, delivered_on: date, link_url: link, notes }),
+    mutationFn: async () => {
+      await saveDelivery(project.studio_id, project.id, { method, delivered_on: date, link_url: link, notes })
+      if (outForDelivery) await runWorkflowAction(project.id, 'mark_out_for_delivery')
+    },
     onSuccess: () => {
-      toast.success('Delivery details saved')
-      for (const k of ['project-delivery', 'project-activity', 'activity']) void qc.invalidateQueries({ queryKey: [k] })
+      toast.success(outForDelivery ? 'Marked out for delivery' : 'Delivery details saved')
+      if (outForDelivery) invalidate(['project-delivery'])
+      else for (const k of ['project-delivery', 'project-activity', 'activity']) void qc.invalidateQueries({ queryKey: [k] })
       onOpenChange(false)
     },
     onError: (e) => setError(errorMessage(e)),
@@ -213,18 +222,48 @@ export function DeliveryDialog({ project, delivery, open, onOpenChange }: { proj
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="sm"
-        title="Delivery details"
-        description="Files stay in your own storage - record how and where the client received them."
-        footer={<><Button variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button><Button onClick={() => save.mutate()} loading={save.isPending} disabled={!date || linkBad}>Save</Button></>}
+        title={outForDelivery ? 'Mark out for delivery' : 'Delivery details'}
+        description={outForDelivery ? 'Add the link or method the client will use. The time is recorded for you, and you can edit these details later.' : 'Files stay in your own storage - record how and where the client receives them.'}
+        footer={<><Button variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button><Button onClick={() => save.mutate()} loading={save.isPending} disabled={linkBad}>{outForDelivery ? 'Mark out for delivery' : 'Save'}</Button></>}
       >
         <div className="space-y-4">
           {error && <Notice tone="danger">{error}</Notice>}
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className={outForDelivery ? undefined : 'grid gap-4 sm:grid-cols-2'}>
             <Field label="Delivery method" required>{(a) => <Select {...a} value={method} onChange={(e) => setMethod(e.target.value as DeliveryMethod)}>{options(DELIVERY_METHOD_LABELS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</Select>}</Field>
-            <Field label="Delivery date" required>{(a) => <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} {...a} />}</Field>
+            {!outForDelivery && <Field label="Delivery date" hint="Optional - filled in when you mark the event delivered">{(a) => <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} {...a} />}</Field>}
           </div>
           <Field label="Download or gallery link" error={linkBad ? 'Enter a full link starting with https://' : undefined} hint="Optional">{(a) => <Input type="url" inputMode="url" placeholder="https://…" value={link} onChange={(e) => setLink(e.target.value)} {...a} />}</Field>
           <Field label="Notes">{(a) => <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} {...a} />}</Field>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* ------------------------------------------------------------ client approval */
+/** Records that the client approved, with who recorded it and when, and moves the event into editing. */
+export function ApprovalDialog({ project, open, onOpenChange }: { project: Pick<ProjectDetail, 'id' | 'name'>; open: boolean; onOpenChange: (o: boolean) => void }) {
+  const invalidate = useInvalidateProject()
+  const [note, setNote] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => { if (open) { setNote(''); setError(null) } }, [open])
+  const approve = useMutation({
+    mutationFn: () => runWorkflowAction(project.id, 'approve_client', note),
+    onSuccess: () => { toast.success('Client approval recorded - editing started'); invalidate(['project-delivery']); onOpenChange(false) },
+    onError: (e) => setError(errorMessage(e)),
+  })
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        size="sm"
+        title="Record client approval"
+        description={project.name}
+        footer={<><Button variant="secondary" onClick={() => onOpenChange(false)} disabled={approve.isPending}>Not yet</Button><Button loading={approve.isPending} onClick={() => approve.mutate()}>Record approval</Button></>}
+      >
+        <div className="space-y-3 text-sm">
+          {error && <Notice tone="danger">{error}</Notice>}
+          <p className="text-ink-muted">Only do this once the client has actually approved. It is recorded with your name and the time, and the event moves into editing.</p>
+          <Field label="How did they approve?" hint="Optional">{(a) => <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Approved the selection on WhatsApp" maxLength={500} {...a} />}</Field>
         </div>
       </DialogContent>
     </Dialog>
