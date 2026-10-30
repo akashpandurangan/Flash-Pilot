@@ -2,32 +2,66 @@
 @import '@fontsource-variable/inter';
 
 /*
-  Flash Pilot design tokens - a restrained black & white system.
-  Semantic colours (success / warning / danger) are used only where they carry meaning.
+  Flash Pilot design tokens.
+  A soft, editorial SaaS look: off-white page, white surfaces, near-black feature panels and a
+  single lime accent that is used sparingly (primary highlights, active states, key metrics).
 */
 @theme {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
 
-  --color-canvas: #ffffff;
-  --color-ink: #111111;
-  --color-ink-muted: #666666;
-  --color-sidebar: #fafafa;
-  --color-line: #e7e7e7;
-  --color-line-strong: #d2d2d2;
-  --color-subtle: #f5f5f5;
-  --color-brand: #111111;
-  --color-brand-hover: #2e2e2e;
+  /* surfaces */
+  --color-page: #f3f3f6;
+  --color-surface: #ffffff;
+  --color-subtle: #f0f1f5;
+  --color-sidebar: #f7f7fa; /* hover / stripe tint on white */
+  --color-dark: #151519;
+  --color-dark-soft: #222228;
 
-  --color-success: #166534;
-  --color-success-soft: #f0fdf4;
-  --color-warning: #92400e;
-  --color-warning-soft: #fffbeb;
-  --color-danger: #b42318;
-  --color-danger-soft: #fef3f2;
+  /* text. ink-muted is a touch darker than the brief's #85858F so small text meets WCAG AA (4.5:1) */
+  --color-ink: #17171b;
+  --color-ink-muted: #6e6e78;
+  --color-ink-faint: #85858f; /* icons, placeholders, disabled - never essential text */
 
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --shadow-pop: 0 8px 24px -6px rgb(0 0 0 / 0.14), 0 2px 6px -2px rgb(0 0 0 / 0.08);
+  /* lines */
+  --color-line: #e8e8ed;
+  --color-line-strong: #d4d4dc;
+
+  /* primary action = near-black; accent = lime */
+  --color-brand: #17171b;
+  --color-brand-hover: #2c2c33;
+  --color-accent: #c7f34a;
+  --color-accent-hover: #bde63a;
+  --color-accent-soft: #eefbc6;
+  --color-accent-ink: #34470b; /* readable text on accent-soft */
+
+  /* semantic text/tint pairs (AA on their soft backgrounds) */
+  --color-success: #3b6a0a;
+  --color-success-soft: #eaf8c8;
+  --color-warning: #8a5a00;
+  --color-warning-soft: #fdf0d2;
+  --color-danger: #c03a24;
+  --color-danger-soft: #fde7e2;
+
+  /* vivid fills for charts, dots and risk markers (never used for small text) */
+  --color-ok: #b9e96a;
+  --color-caution: #f2b84b;
+  --color-risk: #e66b55;
+
+  /* radii: controls 10px, cards 18px, large dashboard panels 22px */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
+  --radius-3xl: 32px;
+  --radius-control: 10px;
+  --radius-card: 18px;
+  --radius-panel: 22px;
+
+  --shadow-card: 0 1px 2px rgb(23 23 27 / 0.04);
+  --shadow-pop: 0 14px 36px -10px rgb(23 23 27 / 0.22), 0 3px 8px -3px rgb(23 23 27 / 0.1);
+  --shadow-float: 0 24px 60px -24px rgb(23 23 27 / 0.28);
 }
 
 @layer base {
@@ -36,7 +70,7 @@
     color-scheme: light;
   }
   body {
-    @apply bg-canvas text-ink font-sans antialiased;
+    @apply bg-page text-ink font-sans antialiased;
     font-feature-settings: 'cv11', 'ss01';
     min-height: 100dvh;
   }
@@ -47,11 +81,14 @@
     outline: 2px solid var(--color-ink);
     outline-offset: 2px;
   }
-  ::selection {
-    background: #111;
-    color: #fff;
+  /* on near-black panels the focus ring switches to the accent */
+  .on-dark :focus-visible {
+    outline-color: var(--color-accent);
   }
-  /* Native date/time inputs: keep the picker icon legible and tap-friendly */
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-ink);
+  }
   input[type='date'],
   input[type='time'] {
     min-height: 2.5rem;
@@ -69,9 +106,51 @@
     scrollbar-width: thin;
     scrollbar-color: var(--color-line-strong) transparent;
   }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
 }
+
+/*
+  Dashboard composition. One column on small screens, then a two-column magazine layout:
+  the featured event sits beside the key numbers and pipeline, the "needs attention" table runs
+  the full width (it has six columns), and insights sit beside the activity feed.
+*/
+.dash-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'kpi' 'featured' 'pipeline' 'attention' 'insights' 'activity';
+}
+@media (min-width: 1280px) {
+  .dash-grid {
+    gap: 1.25rem;
+    /* featured event ~55%, studio overview ~45% */
+    grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr);
+    grid-template-areas:
+      'featured kpi'
+      'featured pipeline'
+      'attention attention'
+      'insights activity';
+  }
+}
+/* people without management access get no attention / insights panels */
+.dash-grid--crew { grid-template-areas: 'kpi' 'featured' 'pipeline' 'activity'; }
+@media (min-width: 1280px) {
+  .dash-grid--crew { grid-template-areas: 'featured kpi' 'featured pipeline' 'activity activity'; }
+}
+/* nothing to feature: the numbers run full width and the short empty state sits beside the pipeline */
+@media (min-width: 1280px) {
+  .dash-grid--no-featured { grid-template-areas: 'kpi kpi' 'featured pipeline' 'attention attention' 'insights activity'; }
+  .dash-grid--crew.dash-grid--no-featured { grid-template-areas: 'kpi kpi' 'featured pipeline' 'activity activity'; }
+}
+.dash-kpi { grid-area: kpi; min-width: 0; }
+.dash-featured { grid-area: featured; min-width: 0; }
+.dash-pipeline { grid-area: pipeline; min-width: 0; }
+.dash-attention { grid-area: attention; min-width: 0; }
+.dash-insights { grid-area: insights; min-width: 0; }
+.dash-activity { grid-area: activity; min-width: 0; }
 
 @keyframes fp-fade-in { from { opacity: 0 } to { opacity: 1 } }
 @keyframes fp-pop-in { from { opacity: 0; transform: translateY(4px) scale(0.98) } to { opacity: 1; transform: none } }
 @keyframes fp-slide-in-left { from { transform: translateX(-100%) } to { transform: none } }
-@keyframes fp-shimmer { 0% { background-position: -200px 0 } 100% { background-position: calc(200px + 100%) 0 } }

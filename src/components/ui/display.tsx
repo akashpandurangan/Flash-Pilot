@@ -7,15 +7,16 @@ import { cn, initials } from '@/lib/utils'
 import { Button } from './button'
 
 /* --------------------------------------------------------------------- badge */
-const badge = cva('inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium leading-4', {
+const badge = cva('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium leading-4', {
   variants: {
     tone: {
-      neutral: 'border-line bg-subtle text-ink',
-      solid: 'border-ink bg-ink text-white',
-      outline: 'border-line-strong bg-canvas text-ink-muted',
-      success: 'border-success/20 bg-success-soft text-success',
-      warning: 'border-warning/25 bg-warning-soft text-warning',
-      danger: 'border-danger/25 bg-danger-soft text-danger',
+      neutral: 'bg-subtle text-ink',
+      solid: 'bg-ink text-white',
+      accent: 'bg-accent text-ink',
+      outline: 'border border-line-strong bg-surface text-ink-muted',
+      success: 'bg-success-soft text-success',
+      warning: 'bg-warning-soft text-warning',
+      danger: 'bg-danger-soft text-danger',
     },
   },
   defaultVariants: { tone: 'neutral' },
@@ -30,16 +31,33 @@ export function Avatar({ name, className }: { name: string | null | undefined; c
   return (
     <span
       aria-hidden
-      className={cn('inline-flex size-8 shrink-0 select-none items-center justify-center rounded-full border border-line bg-subtle text-xs font-semibold text-ink', className)}
+      className={cn('inline-flex size-8 shrink-0 select-none items-center justify-center rounded-full bg-subtle text-xs font-semibold text-ink ring-1 ring-line', className)}
     >
       {initials(name)}
     </span>
   )
 }
 
+/** Overlapping initials for a team; "+N" when there are more than `max`. Names are announced once, not per avatar. */
+export function AvatarStack({ names, max = 3, className }: { names: string[]; max?: number; className?: string }) {
+  if (names.length === 0) return null
+  const shown = names.slice(0, max)
+  return (
+    <span className={cn('inline-flex items-center', className)} role="img" aria-label={`Team: ${names.join(', ')}`}>
+      <span className="flex -space-x-1.5" aria-hidden>
+        {shown.map((n, i) => <Avatar key={`${n}-${i}`} name={n} className="size-7 text-[10px] ring-2 ring-surface" />)}
+        {names.length > max && (
+          <span className="inline-flex size-7 items-center justify-center rounded-full bg-ink text-[10px] font-semibold text-white ring-2 ring-surface">+{names.length - max}</span>
+        )}
+      </span>
+    </span>
+  )
+}
+
 /* -------------------------------------------------------------------- card */
+/** White rounded surface (18px). The base for everything that sits on the grey page. */
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('rounded-lg border border-line bg-canvas', className)} {...props} />
+  return <div className={cn('rounded-card border border-line bg-surface shadow-card', className)} {...props} />
 }
 
 export function Panel({ title, description, action, children, className, bodyClassName }: {
@@ -53,15 +71,15 @@ export function Panel({ title, description, action, children, className, bodyCla
   return (
     <Card className={className}>
       {(title || action) && (
-        <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
+        <div className="flex items-start justify-between gap-3 px-4 pb-0.5 pt-4 sm:px-5 sm:pt-5">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold">{title}</h2>
+            <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
             {description && <p className="mt-0.5 text-xs text-ink-muted">{description}</p>}
           </div>
           {action && <div className="shrink-0">{action}</div>}
         </div>
       )}
-      <div className={cn('p-4', bodyClassName)}>{children}</div>
+      <div className={cn('p-4 sm:p-5', (title || action) && 'pt-3 sm:pt-3.5', bodyClassName)}>{children}</div>
     </Card>
   )
 }
@@ -74,12 +92,12 @@ export function PageHeader({ title, description, actions, breadcrumbs }: {
   breadcrumbs?: { label: string; to?: string }[]
 }) {
   return (
-    <div className="mb-6 space-y-3">
+    <div className="mb-5 space-y-2 md:mb-6">
       {breadcrumbs && <Breadcrumbs items={breadcrumbs} />}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight md:text-2xl">{title}</h1>
-          {description && <p className="mt-1 text-sm text-ink-muted">{description}</p>}
+          <h1 className="text-[26px] font-semibold leading-tight tracking-tight md:text-[30px]">{title}</h1>
+          {description && <p className="mt-1 text-[13px] text-ink-muted md:text-sm">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
@@ -113,35 +131,40 @@ export function StatCard({ label, value, hint, to, icon }: { label: string; valu
         <span>{label}</span>
         {icon && <span aria-hidden className="[&>svg]:size-4">{icon}</span>}
       </div>
-      <div className="mt-2 text-2xl font-semibold tabular-nums tracking-tight">{value}</div>
-      {hint && <div className="mt-1 text-xs text-ink-muted">{hint}</div>}
+      <div className="mt-2 text-2xl font-semibold tabular-nums leading-none tracking-tight">{value}</div>
+      {hint && <div className="mt-1.5 text-xs text-ink-muted">{hint}</div>}
     </>
   )
-  const cls = 'block rounded-lg border border-line bg-canvas p-4'
+  const cls = 'block rounded-card border border-line bg-surface p-4 shadow-card sm:p-5'
   return to ? <Link to={to} className={cn(cls, 'transition-colors hover:border-line-strong hover:bg-sidebar')}>{body}</Link> : <div className={cls}>{body}</div>
 }
 
 /* ------------------------------------------------------------------ states */
 export function Skeleton({ className }: { className?: string }) {
-  return (
-    <div
-      aria-hidden
-      className={cn('animate-pulse rounded-md bg-subtle', className)}
-    />
-  )
+  return <div aria-hidden className={cn('animate-pulse rounded-control bg-subtle', className)} />
 }
 
 export function Spinner({ className, label = 'Loading' }: { className?: string; label?: string }) {
   return <Loader2 role="status" aria-label={label} className={cn('size-5 animate-spin text-ink-muted', className)} />
 }
 
+/** Block-level loading placeholder: a labelled stack of skeleton rows. */
+export function LoadingState({ label = 'Loading', rows = 4, className }: { label?: string; rows?: number; className?: string }) {
+  return (
+    <div role="status" aria-busy="true" aria-label={label} className={cn('space-y-3', className)}>
+      {Array.from({ length: rows }, (_, i) => <Skeleton key={i} className={cn('h-12 w-full', i === 0 && 'h-16')} />)}
+      <span className="sr-only">{label}…</span>
+    </div>
+  )
+}
+
 export function EmptyState({ icon, title, description, action, className }: { icon?: ReactNode; title: string; description?: ReactNode; action?: ReactNode; className?: string }) {
   return (
-    <div className={cn('flex flex-col items-center justify-center rounded-lg border border-dashed border-line-strong px-6 py-12 text-center', className)}>
-      {icon && <div className="mb-3 flex size-10 items-center justify-center rounded-full bg-subtle text-ink-muted [&>svg]:size-5" aria-hidden>{icon}</div>}
+    <div className={cn('flex flex-col items-center justify-center rounded-card border border-dashed border-line-strong bg-surface/60 px-5 py-8 text-center', className)}>
+      {icon && <div className="mb-2.5 flex size-9 items-center justify-center rounded-full bg-subtle text-ink-muted [&>svg]:size-[18px]" aria-hidden>{icon}</div>}
       <h3 className="text-sm font-semibold">{title}</h3>
       {description && <p className="mt-1 max-w-sm text-[13px] leading-relaxed text-ink-muted">{description}</p>}
-      {action && <div className="mt-4">{action}</div>}
+      {action && <div className="mt-3.5">{action}</div>}
     </div>
   )
 }
@@ -149,7 +172,7 @@ export function EmptyState({ icon, title, description, action, className }: { ic
 export function ErrorState({ error, onRetry, title = 'Could not load this' }: { error?: unknown; onRetry?: () => void; title?: string }) {
   const message = error instanceof Error ? error.message : typeof error === 'object' && error && 'message' in error ? String((error as { message: unknown }).message) : undefined
   return (
-    <div role="alert" className="flex flex-col items-center rounded-lg border border-danger/25 bg-danger-soft px-6 py-10 text-center">
+    <div role="alert" className="flex flex-col items-center rounded-card border border-danger/25 bg-danger-soft px-5 py-8 text-center">
       <AlertCircle className="mb-2 size-6 text-danger" aria-hidden />
       <h3 className="text-sm font-semibold text-danger">{title}</h3>
       {message && <p className="mt-1 max-w-md text-[13px] text-ink-muted">{message}</p>}
@@ -184,22 +207,22 @@ export function DataState({ query, isEmpty, skeleton, empty, children }: {
 export function ListSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div className="space-y-2" aria-busy="true" aria-label="Loading">
-      {Array.from({ length: rows }, (_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+      {Array.from({ length: rows }, (_, i) => <Skeleton key={i} className="h-12 w-full rounded-card" />)}
     </div>
   )
 }
 
 const noticeTones = {
   info: { cls: 'border-line bg-subtle text-ink', icon: Info },
-  success: { cls: 'border-success/25 bg-success-soft text-success', icon: CheckCircle2 },
-  warning: { cls: 'border-warning/30 bg-warning-soft text-warning', icon: AlertTriangle },
-  danger: { cls: 'border-danger/30 bg-danger-soft text-danger', icon: AlertCircle },
+  success: { cls: 'border-success/20 bg-success-soft text-success', icon: CheckCircle2 },
+  warning: { cls: 'border-warning/25 bg-warning-soft text-warning', icon: AlertTriangle },
+  danger: { cls: 'border-danger/25 bg-danger-soft text-danger', icon: AlertCircle },
 }
 
 export function Notice({ tone = 'info', title, children, action, className }: { tone?: keyof typeof noticeTones; title?: string; children?: ReactNode; action?: ReactNode; className?: string }) {
   const { cls, icon: Icon } = noticeTones[tone]
   return (
-    <div role={tone === 'danger' || tone === 'warning' ? 'alert' : 'status'} className={cn('flex gap-3 rounded-lg border px-3.5 py-3 text-sm', cls, className)}>
+    <div role={tone === 'danger' || tone === 'warning' ? 'alert' : 'status'} className={cn('flex gap-3 rounded-2xl border px-4 py-3 text-sm', cls, className)}>
       <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
       <div className="min-w-0 flex-1">
         {title && <p className="font-medium">{title}</p>}
@@ -211,20 +234,25 @@ export function Notice({ tone = 'info', title, children, action, className }: { 
 }
 
 /* ------------------------------------------------------------------- table */
+/** A white card holding a table whose header is a soft grey pill. */
 export function TableWrap({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div className={cn('relative overflow-x-auto rounded-lg border border-line scrollbar-thin', className)}>
-      <table className="w-full min-w-max border-collapse text-sm">{children}</table>
+    <div className={cn('relative overflow-x-auto rounded-card border border-line bg-surface p-1.5 shadow-card scrollbar-thin', className)}>
+      <table className="w-full min-w-max border-separate border-spacing-0 text-[13px]">{children}</table>
     </div>
   )
 }
-export const THead = ({ children }: { children: ReactNode }) => <thead className="border-b border-line bg-sidebar text-left">{children}</thead>
+export const THead = ({ children }: { children: ReactNode }) => <thead className="text-left">{children}</thead>
 export const TH = ({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) => (
-  <th scope="col" className={cn('whitespace-nowrap px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-ink-muted', className)} {...props} />
+  <th
+    scope="col"
+    className={cn('whitespace-nowrap bg-subtle px-3 py-2.5 text-xs font-medium text-ink-muted first:rounded-l-full first:pl-4 last:rounded-r-full', className)}
+    {...props}
+  />
 )
-export const TD = ({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) => <td className={cn('px-4 py-3 align-middle', className)} {...props} />
+export const TD = ({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) => <td className={cn('px-3 py-3 align-middle first:pl-4', className)} {...props} />
 export const TR = ({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) => (
-  <tr className={cn('border-b border-line last:border-0 hover:bg-sidebar', className)} {...props} />
+  <tr className={cn('[&>td]:border-b [&>td]:border-line last:[&>td]:border-b-0 hover:bg-sidebar', className)} {...props} />
 )
 
 /* -------------------------------------------------------------- pagination */
@@ -253,7 +281,7 @@ export function Segmented<T extends string>({ value, onChange, options, label }:
   label: string
 }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex rounded-md border border-line-strong bg-canvas p-0.5">
+    <div role="group" aria-label={label} className="inline-flex rounded-full bg-subtle p-1">
       {options.map((o) => (
         <button
           key={o.value}
@@ -261,7 +289,7 @@ export function Segmented<T extends string>({ value, onChange, options, label }:
           aria-pressed={value === o.value}
           aria-label={o.ariaLabel}
           onClick={() => onChange(o.value)}
-          className={cn('inline-flex h-8 items-center gap-1.5 rounded px-3 text-[13px] font-medium transition-colors', value === o.value ? 'bg-ink text-white' : 'text-ink-muted hover:text-ink')}
+          className={cn('inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-colors', value === o.value ? 'bg-ink text-white shadow-card' : 'text-ink-muted hover:text-ink')}
         >
           {o.label}
         </button>

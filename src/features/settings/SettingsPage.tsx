@@ -1,8 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { Aperture, ArrowDown, ArrowUp, ImagePlus, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { Aperture, ArrowDown, ArrowUp, ArrowUpRight, Bell, ImagePlus, Plus, RotateCcw, Trash2, UserRound, UsersRound } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { Link } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { logoUrl, updateStudio, uploadStudioLogo, validateLogo } from '@/api/studio'
@@ -55,7 +56,22 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Studio settings" description="Your studio's details, regional settings, reminders and default checklist." />
+      <PageHeader title="Settings" description="Your studio's details, who can sign in, your account and how you are notified." />
+      <nav aria-label="Related settings" className="mb-6 grid max-w-3xl gap-3 sm:grid-cols-3">
+        {[
+          { to: '/team', icon: <UsersRound />, title: 'Team access', text: 'Invite people and set what they can see.' },
+          { to: '/account', icon: <UserRound />, title: 'Account', text: 'Your profile and password.' },
+          { to: '/notifications?tab=preferences', icon: <Bell />, title: 'Notifications', text: 'Choose which reminders you get.' },
+        ].map((l) => (
+          <Link key={l.to} to={l.to} className="group flex items-start gap-3 rounded-card border border-line bg-surface p-4 shadow-card transition-colors hover:border-line-strong">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-subtle text-ink [&>svg]:size-5" aria-hidden>{l.icon}</span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center justify-between gap-2 font-semibold">{l.title}<ArrowUpRight className="size-4 text-ink-faint transition-colors group-hover:text-ink" aria-hidden /></span>
+              <span className="mt-0.5 block text-[13px] text-ink-muted">{l.text}</span>
+            </span>
+          </Link>
+        ))}
+      </nav>
       <div className="grid max-w-3xl gap-4">
         <form
           noValidate

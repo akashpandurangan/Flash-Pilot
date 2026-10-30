@@ -96,11 +96,35 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await page.getByRole('heading', { level: 1 }).waitFor()
   check('dashboard greets the user', /Good (morning|afternoon|evening), Olivia/.test(await page.getByRole('heading', { level: 1 }).innerText()))
   await page.waitForTimeout(600)
-  check('dashboard shows KPI numbers from the API', (await page.getByText('Active events').count()) > 0 && (await page.getByText('₹1,50,000').count()) > 0)
+  const kpiLabels = ['Upcoming events', 'In production', 'Editing in progress', 'Needs attention']
+  const kpiFound = await Promise.all(kpiLabels.map(async (l) => (await page.getByText(l, { exact: true }).count()) > 0))
+  check('dashboard shows the four overview cards', kpiFound.every(Boolean), kpiLabels.filter((_, i) => !kpiFound[i]).join(', '))
+  // a card is: <div><p>label</p>…</div><p>value</p>
+  const cardValue = async (label) => Number(await page.locator('p', { hasText: new RegExp(`^${label}$`) }).first().locator('xpath=../following-sibling::p[1]').innerText())
+  const [upcomingN, attentionN] = [await cardValue('Upcoming events'), await cardValue('Needs attention')]
+  check('dashboard overview numbers come from the API (upcoming and attention counts are non-zero)', upcomingN > 0 && attentionN > 0, `upcoming=${upcomingN} attention=${attentionN}`)
+  check('dashboard shows the sidebar section labels', (await page.getByText('Studio management', { exact: false }).count()) > 0 && (await page.getByText('Workspace', { exact: false }).count()) > 0)
+  // compact sizing (viewport is 1366x860, so the sidebar is in its normal, not short-screen, form)
+  const sizes = await page.evaluate(() => {
+    const px = (el) => Math.round(el?.getBoundingClientRect().height ?? 0)
+    return {
+      sidebarWidth: Math.round(document.querySelector('aside')?.getBoundingClientRect().width ?? 0),
+      navRow: px(document.querySelector('nav[aria-label="Main"] a')),
+      newEvent: px(document.querySelector('a[aria-label="New event"]')),
+      search: px(document.querySelector('button[aria-label="Search"]')),
+      title: parseFloat(getComputedStyle(document.querySelector('h1')).fontSize),
+      metricValue: parseFloat(getComputedStyle(document.querySelector('p.leading-none')).fontSize),
+    }
+  })
+  check('sidebar is 250-265px wide', sizes.sidebarWidth >= 250 && sizes.sidebarWidth <= 265, `${sizes.sidebarWidth}px`)
+  check('navigation rows are 40-44px', sizes.navRow >= 40 && sizes.navRow <= 44, `${sizes.navRow}px`)
+  check('header search and "New Event" are 42px', sizes.newEvent === 42 && sizes.search === 42, `new event ${sizes.newEvent}px, search ${sizes.search}px`)
+  check('dashboard title is 28-32px and metric numbers are at most 40px', sizes.title >= 28 && sizes.title <= 32 && sizes.metricValue <= 40, `title ${sizes.title}px, metric ${sizes.metricValue}px`)
   check('dashboard lists upcoming events', (await page.getByText('Mehta Corporate Launch').count()) > 0)
-  check('dashboard flags the double-booked photographer in Action required', (await page.getByText('Riya Kapoor is double-booked').count()) > 0)
+  check('dashboard flags the double-booked photographer in Needs attention', (await page.getByText('Photographer double-booked').count()) > 0)
   check('dashboard flags overdue editing', (await page.getByText(/Editing overdue/).count()) > 0)
-  check('dashboard shows unpaid balance alert', (await page.getByText(/outstanding · Sharma/).count()) > 0)
+  check('dashboard shows the unpaid balance as an issue with a clear action', (await page.getByText('Balance payment pending').count()) > 0 && (await page.getByRole('link', { name: /Record payment/ }).count()) > 0)
+  check('insights panel says it is rule-based, not AI', (await page.getByText(/not AI-generated/).count()) > 0)
   await shot(page, '02-dashboard')
 
   const owner = [
@@ -148,6 +172,32 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await shot(page, '17-search')
   check('Ctrl+K opens global search', (await page.getByPlaceholder('Search events, clients, team…').count()) === 1)
   await page.keyboard.press('Escape')
+
+  // redesigned list pages
+  await page.goto(`${BASE}/team`)
+  await page.getByText('Riya Kapoor').first().waitFor()
+  check('team page shows member cards with upcoming sessions and invitation actions', (await page.getByText(/upcoming sessions?/).count()) >= 3 && (await page.getByRole('button', { name: /Invite|Resend invite/ }).count()) > 0)
+  await page.goto(`${BASE}/clients`)
+  await page.getByText('Anita Sharma').first().waitFor()
+  await page.waitForTimeout(500)
+  check('clients list shows each client\'s event count and outstanding balance', (await page.getByRole('columnheader', { name: 'Outstanding' }).count()) === 1 && (await page.getByText('₹1,50,000').count()) > 0)
+  await page.goto(`${BASE}/reports`)
+  await page.getByRole('heading', { name: 'Events per month' }).waitFor()
+  check('reports overview shows charts for events, payments, pipeline and delivery', (await page.getByRole('heading', { name: 'Payments received' }).count()) > 0 && (await page.getByRole('heading', { name: 'Production pipeline' }).count()) > 0 && (await page.getByRole('heading', { name: 'Delivery performance' }).count()) > 0)
+  check('reports charts have a text alternative', (await page.locator('figure figcaption').first().innerText()).startsWith('Events per month:'))
+  await page.goto(`${BASE}/equipment`)
+  await page.getByText('Equipment items').waitFor()
+  check('equipment page summarises availability and shows reservations per item', (await page.getByText('Available now', { exact: true }).count()) > 0 && (await page.getByText(/\d+ upcoming/).count()) > 0)
+  await page.goto(`${BASE}/settings`)
+  await page.getByText('Team access').waitFor()
+  check('settings links to team access, account and notification preferences', (await page.getByRole('navigation', { name: 'Related settings' }).getByRole('link').count()) === 3)
+  await page.goto(`${BASE}/events`)
+  await page.getByText('Sharma–Rao Wedding').first().waitFor()
+  for (const chip of ['All Events', 'Upcoming', 'In Production', 'Editing', 'Ready for Delivery', 'Delivered', 'Cancelled']) {
+    if ((await page.getByRole('button', { name: chip, exact: true }).count()) + (await page.getByRole('radio', { name: chip, exact: true }).count()) === 0) check(`events page has the "${chip}" filter`, false)
+  }
+  check('events page has no "Projects" wording', !/\bProjects?\b/.test(await page.locator('main').innerText()))
+  await page.goto(`${BASE}/`)
 
   // notification bell
   await page.getByRole('button', { name: /Notifications, 1 unread/ }).click()
@@ -198,8 +248,7 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
 
   // sign out
   await page.goto(`${BASE}/`)
-  await page.getByRole('button', { name: 'Account menu' }).click()
-  await page.getByRole('menuitem', { name: 'Sign out' }).click()
+  await page.getByRole('button', { name: 'Sign out' }).click()
   await page.waitForURL(/\/login/)
   check('sign out returns to /login', true)
 }
@@ -227,6 +276,21 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   }
 }
 
+/* ------------------------------------------------------- responsive matrix */
+for (const width of [390, 768, 1024, 1280, 1440]) {
+  const { page } = await newSession('owner', { width, height: width < 800 ? 844 : 900 })
+  await login(page)
+  await page.getByRole('heading', { level: 1 }).waitFor()
+  for (const path of ['/', '/events', `/events/${ids.p1}`, '/calendar', '/clients', '/team', '/equipment', '/reports', '/settings']) {
+    await page.goto(`${BASE}${path}`)
+    await page.waitForTimeout(600)
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    check(`${width}px: ${path === '/' ? 'dashboard' : path.replace(ids.p1, ':id')} has no horizontal page scroll`, over <= 1, `overflow ${over}px`)
+  }
+  if (width === 1440) await shot(page, '45-wide-reports')
+  await page.close()
+}
+
 /* ------------------------------------------------------------------ tablet */
 {
   const { page } = await newSession('owner', { width: 820, height: 1100 })
@@ -247,9 +311,9 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await page.getByRole('heading', { level: 1 }).waitFor()
   await page.waitForTimeout(600)
   const nav = await page.getByRole('navigation', { name: 'Main' }).getByRole('link').allInnerTexts()
-  check('photographer sees only Overview, Events, Calendar, Notifications', JSON.stringify(nav.map((s) => s.trim())) === JSON.stringify(['Overview', 'Events', 'Calendar', 'Notifications']), nav.join(', '))
+  check('photographer sees only Overview, Events, Calendar, Production, Deliveries', JSON.stringify(nav.map((s) => s.replace(/\s+\d+$/, '').trim())) === JSON.stringify(['Overview', 'Events', 'Calendar', 'Production', 'Deliveries']), nav.join(', '))
   check('photographer dashboard hides money', (await page.getByText('Outstanding').count()) === 0)
-  check('photographer dashboard has no "Action required" panel', (await page.getByText('Action required').count()) === 0)
+  check('photographer dashboard has no "Needs attention" table or insights', (await page.getByText('Needs attention').count()) === 0 && (await page.getByText(/not AI-generated/).count()) === 0)
   await shot(page, '50-photographer-dashboard')
   for (const path of ['/payments', '/clients', '/team', '/reports', '/settings', '/equipment', '/events/new']) {
     await page.goto(`${BASE}${path}`)

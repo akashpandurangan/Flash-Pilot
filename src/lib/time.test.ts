@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDaysToDateString, buildEventRange, fmtTime, isoToDateInput, isoToTimeInput, minutesIntoDay, relativeDayLabel, zonedDayBounds, zonedDayKey, zonedToUtcIso } from './time'
+import { addDaysToDateString, buildEventRange, countdownLabel, daysFromToday, fmtTime, isoToDateInput, isoToTimeInput, minutesIntoDay, relativeDayLabel, zonedDayBounds, zonedDayKey, zonedToUtcIso } from './time'
 
 const IST = 'Asia/Kolkata'
 
@@ -46,5 +46,26 @@ describe('time zones', () => {
     const now = new Date('2026-11-14T04:00:00Z')
     expect(relativeDayLabel('2026-11-14T10:00:00Z', IST, now)).toBe('Today')
     expect(relativeDayLabel('2026-11-15T10:00:00Z', IST, now)).toBe('Tomorrow')
+  })
+})
+
+describe('countdown to a session', () => {
+  // 04:00 UTC on the 14th is 09:30 in Kolkata
+  const now = new Date('2026-11-14T04:00:00Z')
+
+  it('counts studio-zone calendar days, not 24-hour blocks', () => {
+    expect(daysFromToday('2026-11-14T18:00:00Z', IST, now)).toBe(0)
+    // 19:00 UTC on the 14th is already 00:30 on the 15th in Kolkata
+    expect(daysFromToday('2026-11-14T19:00:00Z', IST, now)).toBe(1)
+    expect(daysFromToday('2026-11-20T04:00:00Z', IST, now)).toBe(6)
+    expect(daysFromToday('2026-11-13T04:00:00Z', IST, now)).toBe(-1)
+  })
+
+  it('words the distance plainly', () => {
+    expect(countdownLabel(0)).toBe('Today')
+    expect(countdownLabel(1)).toBe('Tomorrow')
+    expect(countdownLabel(6)).toBe('In 6 days')
+    expect(countdownLabel(-1)).toBe('Yesterday')
+    expect(countdownLabel(-5)).toBe('5 days ago')
   })
 })

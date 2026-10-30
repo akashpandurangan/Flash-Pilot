@@ -12,7 +12,7 @@ export function MenuContent({ className, align = 'end', ...props }: ComponentPro
       <DropdownMenu.Content
         align={align}
         sideOffset={6}
-        className={cn('z-50 min-w-48 overflow-hidden rounded-lg border border-line bg-canvas p-1 shadow-pop [animation:fp-pop-in_.12s_ease-out]', className)}
+        className={cn('z-50 min-w-48 overflow-hidden rounded-2xl border border-line bg-surface p-1.5 shadow-pop [animation:fp-pop-in_.12s_ease-out]', className)}
         {...props}
       />
     </DropdownMenu.Portal>
@@ -23,7 +23,7 @@ export function MenuItem({ className, danger, icon, children, ...props }: Compon
   return (
     <DropdownMenu.Item
       className={cn(
-        'flex min-h-9 cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[highlighted]:bg-subtle',
+        'flex min-h-9 cursor-pointer select-none items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[highlighted]:bg-subtle',
         danger && 'text-danger data-[highlighted]:bg-danger-soft',
         className,
       )}
@@ -45,8 +45,8 @@ export const Tabs = RadixTabs.Root
 
 export function TabsList({ className, ...props }: ComponentPropsWithoutRef<typeof RadixTabs.List>) {
   return (
-    <div className="relative -mx-4 overflow-x-auto px-4 scrollbar-thin md:mx-0 md:px-0">
-      <RadixTabs.List className={cn('flex min-w-max gap-1 border-b border-line', className)} {...props} />
+    <div className="relative -mx-4 overflow-x-auto px-4 pb-1 scrollbar-thin md:mx-0 md:px-0">
+      <RadixTabs.List className={cn('inline-flex min-w-max gap-1 rounded-full bg-subtle p-1', className)} {...props} />
     </div>
   )
 }
@@ -55,7 +55,7 @@ export function TabsTrigger({ className, ...props }: ComponentPropsWithoutRef<ty
   return (
     <RadixTabs.Trigger
       className={cn(
-        '-mb-px inline-flex h-10 items-center gap-2 whitespace-nowrap border-b-2 border-transparent px-3 text-sm font-medium text-ink-muted transition-colors hover:text-ink data-[state=active]:border-ink data-[state=active]:text-ink',
+        'inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink data-[state=active]:bg-ink data-[state=active]:text-white data-[state=active]:shadow-card',
         className,
       )}
       {...props}

@@ -7,7 +7,7 @@ import { listFinancials, listPaymentsInRange } from '@/api/payments'
 import { listActiveProjects } from '@/api/projects'
 import { listScheduleEvents } from '@/api/schedule'
 import { Button } from '@/components/ui/button'
-import { Badge, DataState, EmptyState, ListSkeleton, PageHeader, TableWrap, TD, TH, THead, TR } from '@/components/ui/display'
+import { Badge, DataState, EmptyState, ListSkeleton, LoadingState, PageHeader, TableWrap, TD, TH, THead, TR } from '@/components/ui/display'
 import { Input, Select } from '@/components/ui/form'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/menu'
 import { BOOKING_STATUS_LABELS, EVENT_TYPE_LABELS, PAYMENT_METHOD_LABELS, PRODUCTION_STAGES, PRODUCTION_STAGE_LABELS, TEAM_ROLE_LABELS } from '@/lib/constants'
@@ -17,6 +17,7 @@ import { addDaysToDateString, fmtDate, fmtDateOnly, todayKey, zonedDayBounds } f
 import type { BookingStatus, ProductionStage, ProjectFinancials, ProjectOverview } from '@/types/entities'
 import { useStudio } from '@/features/studio/StudioProvider'
 import { useUrlState } from '@/hooks/useUrlState'
+import { ReportsOverview } from './ReportsOverview'
 
 interface Col<T> extends CsvColumn<T> {
   render?: (row: T) => ReactNode
@@ -58,7 +59,7 @@ export default function ReportsPage() {
   const financials = useQuery({ queryKey: ['financials', studio.id], queryFn: () => listFinancials(studio.id), enabled: canFinance })
   const events = useQuery({ queryKey: ['schedule', studio.id, 'report', range.from, range.to], queryFn: () => listScheduleEvents({ studioId: studio.id, ...range }) })
   const employees = useQuery({ queryKey: ['employees', studio.id], queryFn: () => listEmployees(studio.id) })
-  const payments = useQuery({ queryKey: ['payments', studio.id, f.from, f.to], queryFn: () => listPaymentsInRange(studio.id, f.from, f.to), enabled: canFinance && f.tab === 'received' })
+  const payments = useQuery({ queryKey: ['payments', studio.id, f.from, f.to], queryFn: () => listPaymentsInRange(studio.id, f.from, f.to), enabled: canFinance })
 
   // Projects whose events fall inside the chosen window.
   const inRange = useMemo(
@@ -98,9 +99,11 @@ export default function ReportsPage() {
   const overdue = useMemo(() => confirmed.filter((p) => p.production_stage !== 'delivered' && ((p.editing_due_date && p.editing_due_date < today && !p.editing_completed_at) || (p.delivery_due_date && p.delivery_due_date < today))), [confirmed, today])
 
   const q = projects
+  const overviewReady = projects.isSuccess && events.isSuccess && (!canFinance || (financials.isSuccess && payments.isSuccess))
+  const overviewPending = projects.isPending || events.isPending || (canFinance && (financials.isPending || payments.isPending))
   return (
     <>
-      <PageHeader title="Reports" description="Operational snapshots from live data. Every table can be exported to CSV." />
+      <PageHeader title="Reports" description="Bookings, revenue, production and delivery from live data. Every table can be exported to CSV." />
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-[13px] font-medium">From<Input type="date" className="w-40" value={f.from} max={f.to} onChange={(e) => setF({ from: e.target.value })} /></label>
         <label className="flex items-center gap-2 text-[13px] font-medium">To<Input type="date" className="w-40" value={f.to} min={f.from} onChange={(e) => setF({ to: e.target.value })} /></label>
@@ -115,8 +118,28 @@ export default function ReportsPage() {
         </Select>
       </div>
 
+      {overviewReady ? (
+        <ReportsOverview
+          inRange={inRange}
+          all={projects.data ?? []}
+          byStage={byStage}
+          workload={workload}
+          overdueCount={overdue.length}
+          pendingDeliveryCount={pendingDelivery.length}
+          money={canFinance ? { outstanding: outstanding.reduce((s, x) => s + Number(x.fin.balance), 0), received: (payments.data ?? []).filter((p) => p.status === 'valid') } : null}
+          dates={{ from: f.from, to: f.to }}
+          instants={range}
+          today={today}
+          tz={tz}
+          currency={currency}
+        />
+      ) : overviewPending ? (
+        <LoadingState label="Loading overview" rows={3} className="mb-8" />
+      ) : null}
+
+      <h2 className="mb-3 text-lg font-semibold tracking-tight">Detailed reports</h2>
       <Tabs value={f.tab} onValueChange={(tab) => setF({ tab })}>
-        <TabsList>
+        <TabsList className="lg:min-w-0 lg:max-w-full lg:flex-wrap lg:rounded-3xl">
           <TabsTrigger value="bookings">Bookings</TabsTrigger>
           <TabsTrigger value="stages">Production stages</TabsTrigger>
           <TabsTrigger value="upcoming">Upcoming sessions</TabsTrigger>

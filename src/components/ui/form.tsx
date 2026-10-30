@@ -4,7 +4,7 @@ import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type Selec
 import { cn } from '@/lib/utils'
 
 const control =
-  'block w-full rounded-md border border-line-strong bg-canvas px-3 text-sm text-ink placeholder:text-ink-muted/70 transition-colors hover:border-ink-muted/60 focus:border-ink disabled:cursor-not-allowed disabled:bg-subtle disabled:text-ink-muted aria-[invalid=true]:border-danger aria-[invalid=true]:focus:border-danger'
+  'block w-full rounded-md border border-line-strong bg-surface px-3 text-sm text-ink placeholder:text-ink-muted/70 transition-colors hover:border-ink-muted/60 focus:border-ink disabled:cursor-not-allowed disabled:bg-subtle disabled:text-ink-muted aria-[invalid=true]:border-danger aria-[invalid=true]:focus:border-danger'
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...props }, ref) {
   return <input ref={ref} className={cn(control, 'h-10 md:h-9', className)} {...props} />
@@ -73,7 +73,7 @@ export function Checkbox({ label, description, className, ...props }: InputHTMLA
   return (
     <div className={cn('flex items-start gap-2.5', className)}>
       <span className="relative mt-0.5 flex size-4 shrink-0 items-center justify-center">
-        <input id={id} type="checkbox" className="peer size-4 cursor-pointer appearance-none rounded-[4px] border border-line-strong bg-canvas checked:border-ink checked:bg-ink disabled:cursor-not-allowed disabled:opacity-50" {...props} />
+        <input id={id} type="checkbox" className="peer size-4 cursor-pointer appearance-none rounded-[4px] border border-line-strong bg-surface checked:border-ink checked:bg-ink disabled:cursor-not-allowed disabled:opacity-50" {...props} />
         <Check className="pointer-events-none absolute size-3 text-white opacity-0 peer-checked:opacity-100" strokeWidth={3} aria-hidden />
       </span>
       <label htmlFor={id} className="cursor-pointer text-sm leading-5">

@@ -30,6 +30,7 @@ export async function listProjects(f: ProjectFilters): Promise<Page<ProjectOverv
   q = f.archived ? q.not('archived_at', 'is', null) : q.is('archived_at', null)
   if (f.booking) q = q.eq('booking_status', f.booking)
   if (f.stage) q = q.eq('production_stage', f.stage)
+  if (f.stage && !f.booking) q = q.neq('booking_status', 'cancelled')
   if (f.eventType) q = q.eq('event_type', f.eventType)
   if (f.employeeId) q = q.contains('assigned_employee_ids', [f.employeeId])
   if (f.from) q = q.gte('last_event_at', f.from)

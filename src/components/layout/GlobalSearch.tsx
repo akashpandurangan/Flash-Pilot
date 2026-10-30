@@ -46,17 +46,19 @@ export function GlobalSearch() {
   return (
     <RadixDialog.Root open={open} onOpenChange={(v) => (v ? setOpen(true) : close())}>
       <RadixDialog.Trigger asChild>
-        <Button variant="secondary" size="sm" className="hidden w-56 justify-start gap-2 font-normal text-ink-muted lg:inline-flex" aria-label="Search">
-          <Search className="size-3.5" /> Search…
-          <kbd className="ml-auto rounded border border-line px-1.5 text-[11px]">Ctrl K</kbd>
+        <Button variant="secondary" size="lg" className="hidden w-56 justify-start gap-2 border-line px-3.5 text-[13px] font-normal text-ink-muted lg:inline-flex min-[1440px]:w-64" aria-label="Search">
+          <Search className="size-4" />
+          <span className="min-[1440px]:hidden">Search…</span>
+          <span className="hidden min-[1440px]:inline">Search events, clients…</span>
+          <kbd className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-ink">Ctrl K</kbd>
         </Button>
       </RadixDialog.Trigger>
       <RadixDialog.Trigger asChild>
-        <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Search"><Search className="size-[18px]" /></Button>
+        <Button variant="secondary" size="icon-lg" className="border-line lg:hidden" aria-label="Search"><Search className="size-[18px]" /></Button>
       </RadixDialog.Trigger>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/40 [animation:fp-fade-in_.15s_ease-out]" />
-        <RadixDialog.Content className="fixed left-1/2 top-[8dvh] z-50 w-[calc(100%-1.5rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-lg border border-line bg-canvas shadow-pop [animation:fp-pop-in_.15s_ease-out]">
+        <RadixDialog.Content className="fixed left-1/2 top-[8dvh] z-50 w-[calc(100%-1.5rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-card border border-line bg-surface shadow-pop [animation:fp-pop-in_.15s_ease-out]">
           <RadixDialog.Title className="sr-only">Search</RadixDialog.Title>
           <RadixDialog.Description className="sr-only">Search events, clients and team members</RadixDialog.Description>
           <div className="flex items-center gap-2 border-b border-line px-3">
@@ -111,7 +113,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 function Hit({ to, icon, title, meta, right, onClick }: { to: string; icon: React.ReactNode; title: string; meta?: string; right?: React.ReactNode; onClick: () => void }) {
   return (
     <li>
-      <Link to={to} onClick={onClick} className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-subtle focus-visible:bg-subtle">
+      <Link to={to} onClick={onClick} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-subtle focus-visible:bg-subtle">
         <span className="text-ink-muted [&>svg]:size-4" aria-hidden>{icon}</span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium">{title}</span>

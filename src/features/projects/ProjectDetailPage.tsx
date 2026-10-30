@@ -1,17 +1,17 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
-  Archive, ArchiveRestore, Ban, BellRing, CalendarCheck, Camera, CheckCircle2, ExternalLink, MapPin, MoreHorizontal, Pencil, Phone, RotateCcw, Users, X,
+  Archive, ArchiveRestore, Ban, BellRing, CalendarCheck, Camera, CheckCircle2, ExternalLink, MapPin, MoreHorizontal, Pencil, RotateCcw, Users, X,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router'
 import { toast } from 'sonner'
-import { getProject, getProjectOverview, listEventReminders, listProjectActivity, setBookingStatus, setProjectArchived } from '@/api/projects'
+import { getProject, getProjectOverview, listEventReminders, listProjectActivity, listTasks, setBookingStatus, setProjectArchived } from '@/api/projects'
 import { getProjectFinancials } from '@/api/payments'
 import { Button } from '@/components/ui/button'
 import { ActivityTimeline } from '@/features/projects/ActivityTimeline'
-import { Avatar, Badge, Detail, EmptyState, ErrorState, Notice, PageHeader, Panel, Skeleton } from '@/components/ui/display'
+import { Avatar, Badge, Detail, EmptyState, ErrorState, Notice, Panel, Skeleton } from '@/components/ui/display'
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/menu'
-import { BookingBadge, ReminderBadge, StageBadge, StageStepper } from '@/components/ui/status'
+import { ReminderBadge } from '@/components/ui/status'
 import { ASSIGNMENT_ROLE_LABELS, EVENT_TYPE_LABELS } from '@/lib/constants'
 import { errorMessage } from '@/lib/errors'
 import { formatMoney, summarizeFinancials } from '@/lib/money'
@@ -20,6 +20,7 @@ import { fmtDate, fmtDateOnly, fmtTimeRange } from '@/lib/time'
 import type { EventReminder, ProjectEvent } from '@/types/entities'
 import { useStudio } from '@/features/studio/StudioProvider'
 import { useUrlState } from '@/hooks/useUrlState'
+import { EventHero } from './EventHero'
 import { ProjectPaymentsTab } from './PaymentsTab'
 import { ProductionTab } from './ProductionTab'
 import { CancelProjectDialog, EventTeamDialog, ProductionPlanDialog, useInvalidateProject } from './ProjectDialogs'
@@ -41,6 +42,7 @@ export default function ProjectDetailPage() {
   const project = useQuery({ queryKey: ['project', id], queryFn: () => getProject(id) })
   const overview = useQuery({ queryKey: ['project-overview', id], queryFn: () => getProjectOverview(id) })
   const fin = useQuery({ queryKey: ['project-financials', id], queryFn: () => getProjectFinancials(id), enabled: canFinance })
+  const tasks = useQuery({ queryKey: ['project-tasks', id], queryFn: () => listTasks(id) })
   const activity = useQuery({ queryKey: ['project-activity', id], queryFn: () => listProjectActivity(id), enabled: tab === 'activity' })
   const eventIds = (project.data?.project_events ?? []).map((e) => e.id)
   const reminders = useQuery({ queryKey: ['event-reminders', id, eventIds.join(',')], queryFn: () => listEventReminders(eventIds), enabled: canManage && eventIds.length > 0 })
@@ -81,19 +83,16 @@ export default function ProjectDetailPage() {
 
   return (
     <>
-      <PageHeader
-        breadcrumbs={[{ label: 'Events', to: '/events' }, { label: p.name }]}
-        title={<span className="flex flex-wrap items-center gap-x-3 gap-y-1">{p.name}<span className="text-sm font-normal text-ink-muted">{p.project_code}</span></span>}
-        description={
-          <span className="flex flex-wrap items-center gap-2">
-            <BookingBadge status={p.booking_status} />
-            {p.booking_status === 'confirmed' && <StageBadge stage={p.production_stage} />}
-            {frozen && <Badge tone="outline">Archived</Badge>}
-            {o && (can('clients.view') ? <Link to={`/clients/${p.client_id}`} className="text-sm underline-offset-2 hover:underline">{o.client_name}</Link> : <span className="text-sm">{o.client_name}</span>)}
-            {o?.client_phone && <a href={`tel:${o.client_phone.replace(/\s/g, '')}`} className="inline-flex items-center gap-1 text-sm hover:underline"><Phone className="size-3" aria-hidden />{o.client_phone}</a>}
-          </span>
-        }
+      <EventHero
+        project={p}
+        overview={o}
+        tasks={tasks.data ?? null}
+        finance={summary}
+        clientHref={can('clients.view') ? `/clients/${p.client_id}` : null}
+        currency={currency}
+        tz={tz}
         actions={canManage && (
+
           <>
             {p.booking_status === 'inquiry' && !frozen && <Button onClick={() => status.mutate('confirmed')} loading={status.isPending}><CalendarCheck className="size-4" /> Confirm booking</Button>}
             {!frozen && p.booking_status !== 'cancelled' && <Button variant="secondary" asChild><Link to={`/events/${p.id}/edit`}><Pencil className="size-4" /> Edit</Link></Button>}
@@ -123,8 +122,6 @@ export default function ProjectDetailPage() {
       )}
       {p.booking_status === 'cancelled' && <Notice tone="danger" title="This booking is cancelled" className="mb-4">{p.cancel_reason ? `Reason: ${p.cancel_reason}. ` : ''}Reminders are withdrawn and equipment is released. Payments and history are kept.</Notice>}
       {frozen && <Notice tone="warning" className="mb-4">This event is archived and read-only. Restore it from the menu to make changes.</Notice>}
-
-      {p.booking_status === 'confirmed' && <StageStepper stage={p.production_stage} className="mb-5" />}
 
       <Tabs value={tab} onValueChange={(v) => setUrl({ tab: v })}>
         <TabsList>

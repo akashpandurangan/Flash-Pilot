@@ -28,8 +28,8 @@ export function DialogContent({ title, description, children, footer, size = 'md
       <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/40 [animation:fp-fade-in_.15s_ease-out]" />
       <RadixDialog.Content
         className={cn(
-          'fixed z-50 flex max-h-[92dvh] w-full flex-col border border-line bg-canvas shadow-pop [animation:fp-pop-in_.18s_ease-out]',
-          'bottom-0 left-0 rounded-t-xl md:bottom-auto md:left-1/2 md:top-1/2 md:w-[calc(100%-2rem)] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg',
+          'fixed z-50 flex max-h-[92dvh] w-full flex-col border border-line bg-surface shadow-pop [animation:fp-pop-in_.18s_ease-out]',
+          'bottom-0 left-0 rounded-t-2xl md:bottom-auto md:left-1/2 md:top-1/2 md:w-[calc(100%-2rem)] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-card',
           sizes[size],
           className,
         )}
@@ -77,7 +77,7 @@ export function ConfirmDialog({ trigger, open, onOpenChange, title, description,
       {trigger && <AlertDialog.Trigger asChild>{trigger}</AlertDialog.Trigger>}
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 z-50 bg-black/40 [animation:fp-fade-in_.15s_ease-out]" />
-        <AlertDialog.Content className="fixed bottom-0 left-0 z-50 w-full rounded-t-xl border border-line bg-canvas p-5 shadow-pop [animation:fp-pop-in_.18s_ease-out] md:bottom-auto md:left-1/2 md:top-1/2 md:w-[calc(100%-2rem)] md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg">
+        <AlertDialog.Content className="fixed bottom-0 left-0 z-50 w-full rounded-t-2xl border border-line bg-surface p-6 shadow-pop [animation:fp-pop-in_.18s_ease-out] md:bottom-auto md:left-1/2 md:top-1/2 md:w-[calc(100%-2rem)] md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-card">
           <AlertDialog.Title className="text-base font-semibold">{title}</AlertDialog.Title>
           <AlertDialog.Description asChild>
             <div className="mt-2 text-sm leading-relaxed text-ink-muted">{description}</div>

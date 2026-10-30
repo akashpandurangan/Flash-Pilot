@@ -10,8 +10,9 @@ import { createEquipment, updateEquipment, type EquipmentInput } from '@/api/equ
 import { listInventory, listScheduleEvents } from '@/api/schedule'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { Badge, DataState, EmptyState, ListSkeleton, Notice, PageHeader, TableWrap, TD, TH, THead, TR } from '@/components/ui/display'
+import { Badge, Card, DataState, EmptyState, ListSkeleton, Notice, PageHeader, TableWrap, TD, TH, THead, TR } from '@/components/ui/display'
 import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/form'
+import { MetricCard } from '@/components/ui/metric-card'
 import { Menu, MenuContent, MenuItem, MenuTrigger, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/menu'
 import { FilterBar, SearchInput } from '@/components/ui/toolbar'
 import { BookingBadge } from '@/components/ui/status'
@@ -63,6 +64,29 @@ export default function EquipmentPage() {
     return map
   }, [events])
 
+  /** How many upcoming sessions hold each item. */
+  const reservedBy = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const e of events.filter((x) => isActiveEvent(x) && new Date(x.endsAt).getTime() >= Date.now())) {
+      for (const id of new Set(e.equipment.map((r) => r.equipmentId).filter((x): x is string => !!x))) map.set(id, (map.get(id) ?? 0) + 1)
+    }
+    return map
+  }, [events])
+
+  const summary = useMemo(() => {
+    const active = (inventory.data ?? []).filter((i) => i.is_active)
+    const usable = active.filter((i) => i.condition !== 'out_of_service')
+    const units = usable.reduce((s, i) => s + i.quantity_owned, 0)
+    const inUse = usable.reduce((s, i) => s + Math.min(inUseNow.get(i.id) ?? 0, i.quantity_owned), 0)
+    return {
+      items: active.length,
+      units,
+      available: units - inUse,
+      inUse,
+      attention: active.filter((i) => i.condition === 'needs_repair' || i.condition === 'out_of_service').length,
+    }
+  }, [inventory.data, inUseNow])
+
   const reservations = useMemo(() => {
     const names = new Map((inventory.data ?? []).map((i) => [i.id, i.name]))
     const out: { key: string; event: (typeof events)[number]; name: string; qty: number; custom: boolean }[] = []
@@ -105,6 +129,15 @@ export default function EquipmentPage() {
         </Notice>
       )}
 
+      {inventory.isSuccess && summary.items > 0 && (
+        <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <MetricCard tone="dark" label="Equipment items" value={summary.items} hint={`${summary.units} ${summary.units === 1 ? 'unit' : 'units'} in service`} />
+          <MetricCard tone="soft" label="Available now" value={summary.available} hint="Units not in use right now" />
+          <MetricCard tone="soft" label="In use now" value={summary.inUse} hint="Reserved for a session under way" />
+          <MetricCard tone="soft" label="Needs attention" value={summary.attention} hint={summary.attention === 0 ? 'Everything is in working order' : 'Needs repair or out of service'} />
+        </div>
+      )}
+
       <Tabs value={f.tab} onValueChange={(tab) => setF({ tab })}>
         <TabsList>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
@@ -136,7 +169,7 @@ export default function EquipmentPage() {
           >
             <div className="hidden md:block">
               <TableWrap>
-                <THead><tr><TH>Item</TH><TH>Category</TH><TH>Asset ID</TH><TH className="text-right">Owned</TH><TH className="text-right">Available now</TH><TH>Condition</TH><TH>Status</TH><TH className="w-12"><span className="sr-only">Actions</span></TH></tr></THead>
+                <THead><tr><TH>Item</TH><TH>Category</TH><TH>Asset ID</TH><TH className="text-right">Owned</TH><TH className="text-right">Available now</TH><TH className="text-right">Reserved</TH><TH>Condition</TH><TH>Status</TH><TH className="w-12"><span className="sr-only">Actions</span></TH></tr></THead>
                 <tbody>
                   {rows.map((i) => {
                     const used = inUseNow.get(i.id) ?? 0
@@ -148,6 +181,7 @@ export default function EquipmentPage() {
                         <TD className="tabular-nums">{i.asset_tag ?? '—'}</TD>
                         <TD className="text-right tabular-nums">{i.quantity_owned}</TD>
                         <TD className="text-right tabular-nums">{avail}{used > 0 && <span className="ml-1 text-xs text-ink-muted">({used} in use)</span>}</TD>
+                        <TD className="text-right tabular-nums text-ink-muted">{reservedBy.get(i.id) ? <button type="button" onClick={() => setF({ tab: 'reservations' })} className="text-ink underline-offset-2 hover:underline">{reservedBy.get(i.id)} upcoming</button> : '—'}</TD>
                         <TD><Badge tone={i.condition === 'out_of_service' || i.condition === 'needs_repair' ? 'warning' : 'neutral'}>{EQUIPMENT_CONDITION_LABELS[i.condition]}</Badge></TD>
                         <TD>{i.is_active ? <Badge tone="success">Active</Badge> : <Badge tone="outline">Retired</Badge>}</TD>
                         <TD>{canManage && <ItemMenu item={i} onEdit={() => setEditing(i)} onToggle={() => retire.mutate(i)} />}</TD>
@@ -157,15 +191,17 @@ export default function EquipmentPage() {
                 </tbody>
               </TableWrap>
             </div>
-            <ul className="space-y-2 md:hidden">
+            <ul className="space-y-3 md:hidden">
               {rows.map((i) => (
-                <li key={i.id} className="flex items-start gap-3 rounded-lg border border-line p-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{i.name}</p>
-                    <p className="text-xs text-ink-muted">{EQUIPMENT_CATEGORY_LABELS[i.category]}{i.asset_tag && ` · ${i.asset_tag}`} · {i.quantity_owned} owned</p>
-                    <div className="mt-1.5 flex gap-1.5"><Badge tone={i.condition === 'out_of_service' || i.condition === 'needs_repair' ? 'warning' : 'neutral'}>{EQUIPMENT_CONDITION_LABELS[i.condition]}</Badge>{!i.is_active && <Badge tone="outline">Retired</Badge>}</div>
-                  </div>
-                  {canManage && <ItemMenu item={i} onEdit={() => setEditing(i)} onToggle={() => retire.mutate(i)} />}
+                <li key={i.id}>
+                  <Card className="flex items-start gap-3 p-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold">{i.name}</p>
+                      <p className="text-xs text-ink-muted">{EQUIPMENT_CATEGORY_LABELS[i.category]}{i.asset_tag && ` · ${i.asset_tag}`} · {i.quantity_owned} owned{reservedBy.get(i.id) ? ` · ${reservedBy.get(i.id)} upcoming` : ''}</p>
+                      <div className="mt-2 flex gap-1.5"><Badge tone={i.condition === 'out_of_service' || i.condition === 'needs_repair' ? 'warning' : 'neutral'}>{EQUIPMENT_CONDITION_LABELS[i.condition]}</Badge>{!i.is_active && <Badge tone="outline">Retired</Badge>}</div>
+                    </div>
+                    {canManage && <ItemMenu item={i} onEdit={() => setEditing(i)} onToggle={() => retire.mutate(i)} />}
+                  </Card>
                 </li>
               ))}
             </ul>
@@ -179,7 +215,7 @@ export default function EquipmentPage() {
             skeleton={<ListSkeleton />}
             empty={<EmptyState icon={<Package />} title="No upcoming reservations" description="Reserve equipment when you create or edit an event's sessions. Cancelled sessions release their gear automatically." />}
           >
-            <ul className="divide-y divide-line rounded-lg border border-line">
+            <ul className="divide-y divide-line overflow-hidden rounded-card border border-line bg-surface shadow-card">
               {reservations.map((r) => {
                 const issue = conflicts.some((c) => (c.kind === 'equipment' && c.equipmentName === r.name && c.events.some((e) => e.id === r.event.id)) || (c.kind === 'equipment_unavailable' && c.equipmentName === r.name && c.event.id === r.event.id))
                 return (

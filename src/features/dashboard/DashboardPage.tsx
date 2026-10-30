@@ -1,46 +1,58 @@
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Camera, CalendarDays, CheckCircle2, Clapperboard, Contact, FolderKanban, IndianRupee, Truck, UsersRound, Zap } from 'lucide-react'
+import { formatDistanceToNowStrict } from 'date-fns'
+import { Camera, CalendarCheck, Clapperboard, Contact, TriangleAlert, UsersRound } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { getDashboardKpis } from '@/api/dashboard'
 import { listFinancials } from '@/api/payments'
-import { listActiveProjects, listRecentActivity } from '@/api/projects'
+import { getProject, listActiveProjects, listRecentActivity, listTasks } from '@/api/projects'
 import { listInventory, listScheduleEvents } from '@/api/schedule'
-import { Button } from '@/components/ui/button'
-import { Avatar, Badge, EmptyState, ErrorState, PageHeader, Panel, Skeleton, StatCard } from '@/components/ui/display'
-import { BookingBadge } from '@/components/ui/status'
-import { PRODUCTION_STAGES, PRODUCTION_STAGE_LABELS } from '@/lib/constants'
+import { HeaderContent } from '@/components/layout/header-slot'
+import { ActivityFeed } from '@/components/ui/activity-feed'
+import { Card, EmptyState, ErrorState, Panel, Skeleton } from '@/components/ui/display'
+import { MetricCard } from '@/components/ui/metric-card'
+import { buildActionItems, countAttentionEvents } from '@/lib/alerts'
+import { attentionHeadline, buildInsights, computeEventKpis, pickFeaturedEvent } from '@/lib/dashboard'
 import { formatMoney } from '@/lib/money'
-import { buildActionItems, type ActionItem } from '@/lib/alerts'
 import { toConflictEvent } from '@/lib/schedule'
-import { fmtTime, relativeDayLabel } from '@/lib/time'
-import { cn, pluralize } from '@/lib/utils'
-import { ActivityTimeline } from '@/features/projects/ActivityTimeline'
+import { cn } from '@/lib/utils'
 import { useStudio } from '@/features/studio/StudioProvider'
+import { useNow } from '@/hooks/hooks'
+import { AttentionTable } from './AttentionTable'
+import { EventPipeline } from './EventPipeline'
+import { FeaturedEventCard } from './FeaturedEventCard'
+import { InsightCard } from './InsightCard'
+
+const scrollToAttention = () => {
+  const el = document.getElementById('needs-attention')
+  el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  el?.focus({ preventScroll: true })
+}
+
+const ago = (ts: number, now: number) => (now - ts < 60_000 ? 'updated just now' : `updated ${formatDistanceToNowStrict(ts)} ago`)
 
 export default function DashboardPage() {
-  const { studio, me, tz, currency, can, role } = useStudio()
+  const { studio, me, tz, currency, can } = useStudio()
   const isStaff = can('projects.manage')
   const canFinance = can('finance.view')
+  const now = useNow()
 
   const kpis = useQuery({ queryKey: ['dashboard', studio.id], queryFn: () => getDashboardKpis(studio.id) })
+  const projects = useQuery({ queryKey: ['projects', 'active', studio.id], queryFn: () => listActiveProjects(studio.id) })
   const schedule = useQuery({
     queryKey: ['schedule', studio.id, 'dashboard'],
     queryFn: () => listScheduleEvents({ studioId: studio.id, from: new Date().toISOString(), to: new Date(Date.now() + 60 * 86_400_000).toISOString() }),
   })
-  const projects = useQuery({ queryKey: ['projects', 'active', studio.id], queryFn: () => listActiveProjects(studio.id) })
   const financials = useQuery({ queryKey: ['financials', studio.id], queryFn: () => listFinancials(studio.id), enabled: canFinance })
   const inventory = useQuery({ queryKey: ['inventory', studio.id], queryFn: () => listInventory(studio.id), enabled: isStaff })
-  const activity = useQuery({ queryKey: ['activity', studio.id], queryFn: () => listRecentActivity(studio.id, 10) })
+  const activity = useQuery({ queryKey: ['activity', studio.id], queryFn: () => listRecentActivity(studio.id, 8) })
 
-  const clientByProject = useMemo(() => new Map((projects.data ?? []).map((p) => [p.id, p.client_name])), [projects.data])
+  const events = useMemo(() => projects.data ?? [], [projects.data])
+  const featured = useMemo(() => pickFeaturedEvent(events), [events])
+  const featuredDetail = useQuery({ queryKey: ['project', featured?.id], queryFn: () => getProject(featured!.id), enabled: !!featured })
+  const featuredTasks = useQuery({ queryKey: ['project-tasks', featured?.id], queryFn: () => listTasks(featured!.id), enabled: !!featured })
 
-  const upcoming = useMemo(
-    () => (schedule.data ?? []).filter((e) => e.project.booking_status !== 'cancelled' && !e.project.archived_at && new Date(e.ends_at).getTime() >= Date.now()).slice(0, 8),
-    [schedule.data],
-  )
-
-  const actions = useMemo(() => {
+  const items = useMemo(() => {
     if (!isStaff || !schedule.data || !projects.data) return []
     return buildActionItems({
       events: schedule.data.map(toConflictEvent), projects: projects.data, financials: canFinance ? (financials.data ?? []) : null,
@@ -49,93 +61,123 @@ export default function DashboardPage() {
   }, [isStaff, schedule.data, projects.data, financials.data, inventory.data, canFinance, tz, currency])
 
   const k = kpis.data
-  const brandNew = !!k && !projects.isLoading && (projects.data?.length ?? 0) === 0 && (schedule.data?.length ?? 0) === 0
+  const derived = useMemo(() => computeEventKpis(events, items, new Date(now)), [events, items, now])
+  const insights = useMemo(() => buildInsights(items, events, new Date(now)), [items, events, now])
+  const attentionEvents = countAttentionEvents(items)
+  const stages = k?.stage_counts ?? {}
+
+  // sessions assigned in the next 7 days - the fourth card for people who don't manage the studio
+  const sessionsThisWeek = useMemo(
+    () => (schedule.data ?? []).filter((s) => s.project.booking_status !== 'cancelled' && new Date(s.starts_at).getTime() - now <= 7 * 86_400_000 && new Date(s.ends_at).getTime() >= now).length,
+    [schedule.data, now],
+  )
+
+  const loading = kpis.isLoading || projects.isLoading
+  const brandNew = !loading && !kpis.isError && !projects.isError && events.length === 0
+  const updatedAt = Math.max(schedule.dataUpdatedAt, projects.dataUpdatedAt, 0)
+  const updatedLabel = updatedAt ? ago(updatedAt, now) : undefined
 
   const firstName = me.full_name.split(' ')[0]
-  const hour = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: tz }).format(new Date()))
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: tz }).format(new Date(now)))
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+
+  const attentionPill = isStaff && attentionEvents > 0 && (
+    <button
+      type="button"
+      onClick={scrollToAttention}
+      className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-hover"
+    >
+      <TriangleAlert className="size-3.5" aria-hidden />
+      {attentionEvents} {attentionEvents === 1 ? 'event needs' : 'events need'} attention
+    </button>
+  )
 
   return (
     <>
-      <PageHeader
-        title={`${greeting}, ${firstName}`}
-        description={role === 'photographer' || role === 'editor' ? 'Here is the work assigned to you.' : `Here's what's happening at ${studio.name}.`}
-        actions={isStaff && <Button asChild><Link to="/events/new"><FolderKanban className="size-4" /> New event</Link></Button>}
-      />
+      {/* From `sm` up the greeting shares the header row with search, notifications and "New Event". */}
+      <HeaderContent>
+        <h2 className="truncate text-lg font-semibold tracking-tight sm:hidden">Overview</h2>
+        <div className="hidden min-w-0 flex-wrap items-center gap-x-4 gap-y-2 sm:flex">
+          <div className="min-w-0">
+            <h1 className="truncate text-[28px] font-semibold leading-tight tracking-tight min-[1440px]:text-[30px]">{greeting}, {firstName}</h1>
+            <p className="truncate text-[13px] text-ink-muted md:text-sm">Here's what's happening at your studio today.</p>
+          </div>
+          {attentionPill}
+        </div>
+      </HeaderContent>
+      {/* On phones four header buttons leave no room for it, so it sits at the top of the page instead. */}
+      <div className="mb-4 sm:hidden">
+        <h1 className="text-2xl font-semibold leading-tight tracking-tight">{greeting}, {firstName}</h1>
+        <p className="mt-0.5 text-[13px] text-ink-muted">Here's what's happening at your studio today.</p>
+        {attentionPill && <div className="mt-3">{attentionPill}</div>}
+      </div>
 
-      {kpis.isError && <div className="mb-6"><ErrorState error={kpis.error} onRetry={() => void kpis.refetch()} /></div>}
+      {(kpis.isError || projects.isError) && (
+        <div className="mb-4"><ErrorState error={kpis.error ?? projects.error} onRetry={() => { void kpis.refetch(); void projects.refetch() }} /></div>
+      )}
 
-      <section aria-label="Key numbers" className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {kpis.isLoading ? Array.from({ length: canFinance ? 6 : 5 }, (_, i) => <Skeleton key={i} className="h-24" />) : k && (
-          <>
-            <StatCard label="Active events" value={k.active_projects} hint={k.inquiries > 0 ? pluralize(k.inquiries, 'inquiry', 'inquiries') : 'Confirmed & in progress'} to="/events?booking=confirmed" icon={<FolderKanban />} />
-            <StatCard label="Upcoming sessions" value={k.upcoming_events} to="/calendar?view=list" icon={<CalendarDays />} />
-            <StatCard label="Today" value={k.today_events} hint={k.today_events === 1 ? 'session today' : 'sessions today'} to="/calendar?view=day" icon={<Zap />} />
-            {canFinance && <StatCard label="Outstanding" value={formatMoney(k.outstanding_amount ?? 0, currency)} hint="Still to collect" to="/payments" icon={<IndianRupee />} />}
-            <StatCard label="In production" value={k.in_production} to="/events?stage=production" icon={<Camera />} />
-            <StatCard label="Pending delivery" value={k.pending_delivery} hint="Editing or ready" to="/events?stage=editing" icon={<Truck />} />
-          </>
-        )}
-      </section>
-
-      {brandNew ? (
-        <GettingStarted canManage={isStaff} />
-      ) : (
-        <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
-          <div className="min-w-0 space-y-4">
-            <Panel title="Upcoming sessions" description="Next on the schedule" action={<Button variant="ghost" size="sm" asChild><Link to="/calendar">Calendar</Link></Button>} bodyClassName="p-0">
-              {schedule.isLoading ? <div className="space-y-2 p-4"><Skeleton className="h-14" /><Skeleton className="h-14" /><Skeleton className="h-14" /></div>
-                : schedule.isError ? <div className="p-4"><ErrorState error={schedule.error} onRetry={() => void schedule.refetch()} /></div>
-                : upcoming.length === 0 ? <div className="p-4"><EmptyState icon={<CalendarDays />} title="No upcoming sessions" description={isStaff ? 'Create an event to put sessions on the calendar.' : 'You have no upcoming assignments.'} /></div>
-                : (
-                  <ul className="divide-y divide-line">
-                    {upcoming.map((e) => {
-                      const photographers = (e.event_assignments ?? []).filter((a) => a.role === 'lead_photographer' || a.role === 'second_photographer')
-                      return (
-                        <li key={e.id}>
-                          <Link to={`/events/${e.project_id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3 hover:bg-sidebar">
-                            <div className="w-24 shrink-0">
-                              <p className="text-sm font-semibold">{relativeDayLabel(e.starts_at, tz).replace(/^\w{3}, /, '')}</p>
-                              <p className="text-xs tabular-nums text-ink-muted">{fmtTime(e.starts_at, tz)}</p>
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium">{e.project.name} <span className="font-normal text-ink-muted">· {e.title}</span></p>
-                              <p className="truncate text-xs text-ink-muted">{[clientByProject.get(e.project_id), e.venue_name].filter(Boolean).join(' · ') || 'No venue yet'}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {photographers.length > 0 ? (
-                                <span className="flex -space-x-1.5" title={photographers.map((a) => a.employee?.full_name).join(', ')}>
-                                  {photographers.slice(0, 3).map((a) => <Avatar key={a.id} name={a.employee?.full_name} className="size-6 border-2 border-canvas text-[10px]" />)}
-                                </span>
-                              ) : isStaff ? <Badge tone="warning">Unstaffed</Badge> : null}
-                              <BookingBadge status={e.project.booking_status} />
-                            </div>
-                          </Link>
-                        </li>
-                      )
-                    })}
-                  </ul>
+      {brandNew ? <GettingStarted canManage={isStaff} /> : (
+        <div className={cn('dash-grid', !isStaff && 'dash-grid--crew', !loading && !featured && 'dash-grid--no-featured')}>
+          <section className="dash-kpi" aria-label="Key numbers">
+            <Card className="rounded-panel p-4 sm:p-5">
+              <h2 className="mb-3 px-0.5 text-[17px] font-semibold tracking-tight">Studio overview</h2>
+              <div className={cn('grid grid-cols-2 gap-3 md:grid-cols-4', loading || featured ? 'xl:grid-cols-2' : 'xl:grid-cols-4')}>
+                {loading ? Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-28 rounded-card" />) : (
+                  <>
+                    <MetricCard tone="dark" label="Upcoming events" value={derived.upcoming} hint={`${derived.upcomingNext7} in the next 7 days`} to="/events?stage=upcoming" />
+                    <MetricCard label="In production" value={stages.production ?? 0} hint={derived.awaitingEditing > 0 ? `${derived.awaitingEditing} shot, awaiting editing` : 'Shoots in progress'} to="/events?stage=production" />
+                    <MetricCard label="Editing in progress" value={stages.editing ?? 0} hint={`${stages.ready_for_delivery ?? 0} ready for delivery`} to="/events?stage=editing" />
+                    {isStaff ? (
+                      <MetricCard
+                        label="Needs attention"
+                        value={attentionEvents}
+                        hint={canFinance && k?.outstanding_amount ? `${formatMoney(k.outstanding_amount, currency)} outstanding` : attentionEvents === 0 ? 'All clear' : 'Events with open issues'}
+                        onClick={scrollToAttention}
+                      />
+                    ) : (
+                      <MetricCard label="Assigned this week" value={sessionsThisWeek} hint="Sessions in the next 7 days" to="/calendar?view=list" />
+                    )}
+                  </>
                 )}
-            </Panel>
+              </div>
+            </Card>
+          </section>
 
-            <Panel title="Production overview" description="Confirmed events by stage">
-              {kpis.isLoading ? <Skeleton className="h-32" /> : <StageBars counts={k?.stage_counts ?? {}} />}
-            </Panel>
+          <div className="dash-featured">
+            {loading ? <Skeleton className="h-[22rem] rounded-panel" /> : featured ? (
+              <FeaturedEventCard event={featured} detail={featuredDetail.data} tasks={featuredTasks.data ?? null} detailLoading={featuredDetail.isLoading} tz={tz} />
+            ) : (
+              <EmptyState
+                className="h-full min-h-40 rounded-panel"
+                icon={<CalendarCheck />}
+                title="No upcoming events"
+                description={isStaff ? 'Create an event and the next one will be featured here.' : 'When you are assigned to an event, the next one is featured here.'}
+              />
+            )}
           </div>
 
-          <div className="min-w-0 space-y-4">
-            {isStaff && (
-              <Panel title="Action required" description={actions.length ? `${actions.length} ${actions.length === 1 ? 'item needs' : 'items need'} attention` : undefined} bodyClassName="p-0">
-                {schedule.isLoading || projects.isLoading ? <div className="space-y-2 p-4"><Skeleton className="h-12" /><Skeleton className="h-12" /></div>
-                  : actions.length === 0 ? (
-                    <div className="flex items-center gap-3 p-4 text-sm text-ink-muted"><CheckCircle2 className="size-5 shrink-0 text-success" aria-hidden /> You're all caught up - nothing needs attention.</div>
-                  ) : (
-                    <ul className="max-h-[26rem] divide-y divide-line overflow-y-auto">{actions.slice(0, 12).map((a) => <ActionRow key={a.id} item={a} />)}</ul>
-                  )}
-              </Panel>
-            )}
-            <Panel title="Recent activity" bodyClassName="p-0">
-              <ActivityTimeline query={activity} showProject empty="Activity will appear here as you work." />
+          <div className="dash-pipeline">
+            {loading ? <Skeleton className="h-36 rounded-panel" /> : <EventPipeline counts={stages} />}
+          </div>
+
+          {isStaff && (
+            <>
+              <div className="dash-attention">
+                {schedule.isLoading || projects.isLoading ? <Skeleton className="h-72 rounded-panel" /> : schedule.isError ? <ErrorState error={schedule.error} onRetry={() => void schedule.refetch()} /> : (
+                  <AttentionTable items={items} tz={tz} eventCount={attentionEvents} updatedLabel={updatedLabel} />
+                )}
+              </div>
+              <div className="dash-insights">
+                {schedule.isLoading || projects.isLoading ? <Skeleton className="h-60 rounded-panel" /> : (
+                  <InsightCard headline={attentionHeadline(items)} insights={insights} updatedLabel={updatedLabel ?? 'Live data'} onReview={scrollToAttention} />
+                )}
+              </div>
+            </>
+          )}
+
+          <div className="dash-activity">
+            <Panel title="Recent activity" className="h-full rounded-panel" bodyClassName="p-0 pt-1">
+              <ActivityFeed query={activity} showProject empty="Activity will appear here as you work." compact />
             </Panel>
           </div>
         </div>
@@ -144,41 +186,9 @@ export default function DashboardPage() {
   )
 }
 
-function ActionRow({ item }: { item: ActionItem }) {
-  return (
-    <li>
-      <Link to={item.href} className="flex items-start gap-3 px-4 py-3 hover:bg-sidebar">
-        <AlertTriangle className={cn('mt-0.5 size-4 shrink-0', item.severity === 'high' ? 'text-danger' : item.severity === 'medium' ? 'text-warning' : 'text-ink-muted')} aria-hidden />
-        <span className="min-w-0 text-sm"><span className="block font-medium">{item.title}</span><span className="block truncate text-xs text-ink-muted">{item.detail}</span></span>
-      </Link>
-    </li>
-  )
-}
-
-function StageBars({ counts }: { counts: Partial<Record<(typeof PRODUCTION_STAGES)[number], number>> }) {
-  const total = PRODUCTION_STAGES.reduce((s, st) => s + Number(counts[st] ?? 0), 0)
-  if (total === 0) return <p className="py-4 text-center text-sm text-ink-muted">No confirmed events yet.</p>
-  const max = Math.max(...PRODUCTION_STAGES.map((s) => Number(counts[s] ?? 0)))
-  return (
-    <ul className="space-y-3">
-      {PRODUCTION_STAGES.map((s) => {
-        const n = Number(counts[s] ?? 0)
-        return (
-          <li key={s}>
-            <Link to={`/events?booking=confirmed&stage=${s}`} className="group block">
-              <div className="mb-1 flex justify-between text-sm"><span className="group-hover:underline">{PRODUCTION_STAGE_LABELS[s]}</span><span className="tabular-nums font-medium">{n}</span></div>
-              <div className="h-2 rounded-full bg-subtle" role="presentation"><div className="h-full rounded-full bg-ink transition-[width]" style={{ width: `${max ? (n / max) * 100 : 0}%` }} /></div>
-            </Link>
-          </li>
-        )
-      })}
-    </ul>
-  )
-}
-
 function GettingStarted({ canManage }: { canManage: boolean }) {
   if (!canManage) {
-    return <EmptyState icon={<CalendarDays />} title="Nothing assigned yet" description="When the studio assigns you to a session or an edit it will show up here, and you'll get a reminder the day before." />
+    return <EmptyState icon={<CalendarCheck />} title="Nothing assigned yet" description="When the studio assigns you to a session or an edit it will show up here, and you'll get a reminder the day before." className="rounded-panel" />
   }
   const steps = [
     { to: '/clients', icon: <Contact />, title: 'Add a client', body: 'Contact details and every event in one place.' },
@@ -187,12 +197,14 @@ function GettingStarted({ canManage }: { canManage: boolean }) {
     { to: '/equipment', icon: <Camera />, title: 'List your equipment', body: 'Reserve gear and catch double-bookings.' },
   ]
   return (
-    <Panel title="Let's get your studio going" description="Four steps and Flash Pilot starts working for you. The dashboard fills in as you go.">
-      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <Card className="rounded-panel p-5 sm:p-6">
+      <h2 className="text-xl font-semibold tracking-tight">Let's get your studio going</h2>
+      <p className="mt-1 text-sm text-ink-muted">Four steps and Flash Pilot starts working for you. The dashboard fills in as you go.</p>
+      <ul className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {steps.map((s, i) => (
           <li key={s.to}>
-            <Link to={s.to} className="flex h-full flex-col rounded-lg border border-line p-4 transition-colors hover:border-ink hover:bg-sidebar">
-              <span className="mb-3 flex size-9 items-center justify-center rounded-full bg-subtle [&>svg]:size-4" aria-hidden>{s.icon}</span>
+            <Link to={s.to} className="flex h-full flex-col rounded-card bg-subtle p-4 transition-colors hover:bg-accent">
+              <span className="mb-3 flex size-9 items-center justify-center rounded-full bg-surface [&>svg]:size-4" aria-hidden>{s.icon}</span>
               <span className="text-xs text-ink-muted">Step {i + 1}</span>
               <span className="text-sm font-semibold">{s.title}</span>
               <span className="mt-1 text-[13px] text-ink-muted">{s.body}</span>
@@ -200,6 +212,6 @@ function GettingStarted({ canManage }: { canManage: boolean }) {
           </li>
         ))}
       </ul>
-    </Panel>
+    </Card>
   )
 }

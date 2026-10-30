@@ -57,7 +57,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-dvh bg-sidebar">
-      <header className="flex h-14 items-center border-b border-line bg-canvas px-4 md:px-8">
+      <header className="flex h-14 items-center border-b border-line bg-surface px-4 md:px-8">
         <div className="flex items-center gap-2 font-semibold"><Aperture className="size-5" aria-hidden /> Flash Pilot</div>
       </header>
       <div className="mx-auto max-w-2xl px-4 py-8 md:py-12">
@@ -67,7 +67,7 @@ export default function OnboardingPage() {
             const done = n < current
             return (
               <li key={label} className="flex flex-1 items-center gap-2" aria-current={n === current ? 'step' : undefined}>
-                <span className={cn('flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold', done ? 'border-ink bg-ink text-white' : n === current ? 'border-ink bg-canvas' : 'border-line-strong text-ink-muted')}>
+                <span className={cn('flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold', done ? 'border-ink bg-ink text-white' : n === current ? 'border-ink bg-surface' : 'border-line-strong text-ink-muted')}>
                   {done ? <Check className="size-3.5" strokeWidth={3} aria-hidden /> : n}
                 </span>
                 <span className={cn('hidden text-sm sm:inline', n === current ? 'font-medium' : 'text-ink-muted')}>{label}</span>
@@ -77,7 +77,7 @@ export default function OnboardingPage() {
           })}
         </ol>
 
-        <div className="rounded-lg border border-line bg-canvas p-5 md:p-8">
+        <div className="rounded-lg border border-line bg-surface p-5 md:p-8">
           {current === 1 && <StudioStep onDone={async () => { await refetch(); setStep(2) }} />}
           {current === 2 && membership && (
             <OwnerStep

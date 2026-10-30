@@ -134,7 +134,7 @@ function Warnings({ conflicts }: { conflicts: ReturnType<typeof findAllConflicts
 function chipStyle(e: ScheduleEvent) {
   if (e.project.booking_status === 'confirmed') return 'bg-ink text-white hover:bg-brand-hover'
   if (e.project.booking_status === 'cancelled') return 'border border-line bg-subtle text-ink-muted line-through'
-  return 'border border-dashed border-ink-muted bg-canvas text-ink hover:bg-subtle'
+  return 'border border-dashed border-ink-muted bg-surface text-ink hover:bg-subtle'
 }
 
 function names(e: ScheduleEvent): string {
@@ -236,7 +236,7 @@ function TimeGrid({ days, events, tz, today, warned, onDay }: { days: string[]; 
         <div ref={scroller} className="max-h-[68dvh] overflow-y-auto">
           <div className="relative grid" style={{ gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))`, height: 24 * HOUR }}>
             <div aria-hidden>
-              {hours.map((h) => <div key={h} className="relative border-t border-line text-right" style={{ height: HOUR }}><span className="absolute -top-2 right-1.5 bg-canvas px-0.5 text-[10px] text-ink-muted">{h === 0 ? '' : `${((h + 11) % 12) + 1} ${h < 12 ? 'AM' : 'PM'}`}</span></div>)}
+              {hours.map((h) => <div key={h} className="relative border-t border-line text-right" style={{ height: HOUR }}><span className="absolute -top-2 right-1.5 bg-surface px-0.5 text-[10px] text-ink-muted">{h === 0 ? '' : `${((h + 11) % 12) + 1} ${h < 12 ? 'AM' : 'PM'}`}</span></div>)}
             </div>
             {columns.map(({ d, items }) => (
               <div key={d} className="relative border-l border-line">

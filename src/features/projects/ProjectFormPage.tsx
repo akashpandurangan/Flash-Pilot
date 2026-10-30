@@ -269,7 +269,7 @@ function ProjectForm({ project, finance, clients, employees, inventory, presetCl
         </div>
 
         {/* sticky action bar */}
-        <div className="sticky bottom-0 z-20 -mx-4 border-t border-line bg-canvas/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+        <div className="sticky bottom-0 z-20 -mx-4 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 text-sm">
               {formError ? (

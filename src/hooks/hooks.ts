@@ -52,3 +52,13 @@ export function useUnsavedChangesWarning(dirty: boolean) {
     return () => window.removeEventListener('beforeunload', handler)
   }, [dirty])
 }
+
+/** The current time, refreshed on an interval - for "updated 5 minutes ago" style labels. */
+export function useNow(intervalMs = 30_000): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs)
+    return () => clearInterval(id)
+  }, [intervalMs])
+  return now
+}

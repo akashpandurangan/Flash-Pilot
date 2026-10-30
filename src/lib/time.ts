@@ -81,6 +81,23 @@ export function relativeDayLabel(iso: string, tz: string, now: Date = new Date()
   return fmtDate(iso, tz)
 }
 
+/** Whole studio-zone calendar days from today to the day of an instant: 0 = today, 1 = tomorrow, -1 = yesterday. */
+export function daysFromToday(iso: string, tz: string, now: Date = new Date()): number {
+  const toUtcDay = (key: string) => {
+    const [y, m, d] = key.split('-').map(Number) as [number, number, number]
+    return Date.UTC(y, m - 1, d)
+  }
+  return Math.round((toUtcDay(zonedDayKey(iso, tz)) - toUtcDay(todayKey(tz, now))) / 86_400_000)
+}
+
+/** "Today", "Tomorrow", "In 5 days", "Yesterday", "5 days ago". */
+export function countdownLabel(days: number): string {
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Tomorrow'
+  if (days === -1) return 'Yesterday'
+  return days > 0 ? `In ${days} days` : `${-days} days ago`
+}
+
 /** yyyy-MM-dd (a date-only value such as a due date) formatted without zone shifts. */
 export function fmtDateOnly(date: string | null | undefined): string {
   if (!date) return '—'

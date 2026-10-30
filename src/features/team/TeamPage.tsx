@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { KeyRound, MailPlus, MoreHorizontal, Pencil, Plus, ShieldOff, UserCheck, UserX, UsersRound } from 'lucide-react'
+import { KeyRound, Mail, MailPlus, MoreHorizontal, Pencil, Phone, Plus, ShieldOff, UserCheck, UserX, UsersRound } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -9,13 +9,13 @@ import { createEmployee, inviteEmployee, listEmployees, revokeAccess, updateAcce
 import { listScheduleEvents } from '@/api/schedule'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog, Dialog, DialogContent } from '@/components/ui/dialog'
-import { Avatar, Badge, DataState, EmptyState, ListSkeleton, Notice, PageHeader, TableWrap, TD, TH, THead, TR } from '@/components/ui/display'
+import { Avatar, Badge, Card, DataState, EmptyState, ListSkeleton, Notice, PageHeader } from '@/components/ui/display'
 import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/form'
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/menu'
 import { FilterBar, SearchInput } from '@/components/ui/toolbar'
 import { ACCESS_ROLE_DESCRIPTIONS, ACCESS_ROLE_LABELS, DEFAULT_ACCESS_FOR_TEAM_ROLE, TEAM_ROLE_LABELS, options } from '@/lib/constants'
 import { errorMessage } from '@/lib/errors'
-import { isValidEmail, isValidPhone } from '@/lib/utils'
+import { cn, isValidEmail, isValidPhone } from '@/lib/utils'
 import type { AccessRole, Employee } from '@/types/entities'
 import { useStudio } from '@/features/studio/StudioProvider'
 import { useUrlState } from '@/hooks/useUrlState'
@@ -117,50 +117,70 @@ export default function TeamPage() {
           )
         }
       >
-        <div className="hidden md:block">
-          <TableWrap>
-            <THead><tr><TH>Name</TH><TH>Role</TH><TH>Phone</TH><TH>Email</TH><TH>Access</TH><TH className="text-right">Upcoming</TH><TH>Status</TH><TH className="w-12"><span className="sr-only">Actions</span></TH></tr></THead>
-            <tbody>
-              {rows.map((e) => {
-                const acc = accessLabel(e)
-                return (
-                  <TR key={e.id} className={e.is_active ? '' : 'text-ink-muted'}>
-                    <TD><div className="flex items-center gap-3"><Avatar name={e.full_name} /><div className="min-w-0"><p className="truncate font-medium text-ink">{e.full_name}</p>{e.job_title && <p className="truncate text-xs text-ink-muted">{e.job_title}</p>}</div></div></TD>
-                    <TD>{TEAM_ROLE_LABELS[e.team_role]}</TD>
-                    <TD className="tabular-nums">{e.phone ?? '—'}</TD>
-                    <TD className="max-w-52 truncate">{e.email ?? '—'}</TD>
-                    <TD><Badge tone={acc.tone}>{acc.label}</Badge></TD>
-                    <TD className="text-right tabular-nums">{counts.get(e.id) ?? 0}</TD>
-                    <TD>{e.is_active ? <Badge tone="success">Active</Badge> : <Badge tone="outline">Inactive</Badge>}</TD>
-                    <TD>{canManage && <RowMenu e={e} isOwner={isOwner} onEdit={() => setEditing(e)} onAccess={() => setAccess(e)} onToggle={() => toggleActive.mutate(e)} />}</TD>
-                  </TR>
-                )
-              })}
-            </tbody>
-          </TableWrap>
-        </div>
-        <ul className="space-y-2 md:hidden">
-          {rows.map((e) => {
-            const acc = accessLabel(e)
-            return (
-              <li key={e.id} className="flex items-start gap-3 rounded-lg border border-line p-3">
-                <Avatar name={e.full_name} className="size-10" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{e.full_name}</p>
-                  <p className="text-xs text-ink-muted">{TEAM_ROLE_LABELS[e.team_role]} · {counts.get(e.id) ?? 0} upcoming</p>
-                  <p className="truncate text-xs text-ink-muted">{[e.phone, e.email].filter(Boolean).join(' · ')}</p>
-                  <div className="mt-1.5 flex gap-1.5"><Badge tone={acc.tone}>{acc.label}</Badge>{!e.is_active && <Badge tone="outline">Inactive</Badge>}</div>
-                </div>
-                {canManage && <RowMenu e={e} isOwner={isOwner} onEdit={() => setEditing(e)} onAccess={() => setAccess(e)} onToggle={() => toggleActive.mutate(e)} />}
-              </li>
-            )
-          })}
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {rows.map((e) => (
+            <li key={e.id}>
+              <MemberCard
+                e={e}
+                upcoming={counts.get(e.id) ?? 0}
+                canManage={canManage}
+                isOwner={isOwner}
+                onEdit={() => setEditing(e)}
+                onAccess={() => setAccess(e)}
+                onToggle={() => toggleActive.mutate(e)}
+              />
+            </li>
+          ))}
         </ul>
       </DataState>
 
       <EmployeeFormDialog open={editing !== null} onOpenChange={(o) => !o && setEditing(null)} employee={editing === 'new' ? null : editing} studioId={studio.id} />
       <AccessDialog employee={access} onClose={() => setAccess(null)} tz={tz} />
     </>
+  )
+}
+
+/** One person: who they are, how to reach them, whether they can sign in, and how busy they are. */
+function MemberCard({ e, upcoming, canManage, isOwner, onEdit, onAccess, onToggle }: {
+  e: Employee
+  upcoming: number
+  canManage: boolean
+  isOwner: boolean
+  onEdit: () => void
+  onAccess: () => void
+  onToggle: () => void
+}) {
+  const acc = accessLabel(e)
+  const pending = e.invite_status === 'pending'
+  // Only owners send invitations; owners themselves already have an account.
+  const canInvite = canManage && isOwner && e.is_active && e.access_role !== 'owner' && (!e.access_role || pending)
+  return (
+    <Card className={cn('flex h-full flex-col p-4 sm:p-5', !e.is_active && 'bg-subtle/60')}>
+      <div className="flex items-center gap-3">
+        <Avatar name={e.full_name} className="size-11" />
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-base font-semibold tracking-tight">{e.full_name}</h3>
+          {e.job_title && <p className="truncate text-sm text-ink-muted">{e.job_title}</p>}
+        </div>
+        {canManage && <RowMenu e={e} isOwner={isOwner} onEdit={onEdit} onAccess={onAccess} onToggle={onToggle} />}
+      </div>
+      <div className="mt-3.5 flex flex-wrap gap-1.5">
+        <Badge tone="neutral">{TEAM_ROLE_LABELS[e.team_role]}</Badge>
+        <Badge tone={acc.tone}>{acc.label}</Badge>
+        {e.is_active ? <Badge tone="success">Active</Badge> : <Badge tone="outline">Inactive</Badge>}
+      </div>
+      <dl className="mt-4 space-y-1.5 text-sm">
+        <div className="flex items-center gap-2"><Phone className="size-4 shrink-0 text-ink-faint" aria-hidden /><dt className="sr-only">Phone</dt><dd className={cn('truncate tabular-nums', !e.phone && 'text-ink-muted')}>{e.phone ?? 'No phone number'}</dd></div>
+        <div className="flex items-center gap-2"><Mail className="size-4 shrink-0 text-ink-faint" aria-hidden /><dt className="sr-only">Email</dt><dd className={cn('truncate', !e.email && 'text-ink-muted')}>{e.email ?? 'No email address'}</dd></div>
+      </dl>
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-5">
+        <p className="flex items-baseline gap-1.5 whitespace-nowrap">
+          <span className="text-xl font-semibold tabular-nums">{upcoming}</span>
+          <span className="text-sm text-ink-muted">upcoming {upcoming === 1 ? 'session' : 'sessions'}</span>
+        </p>
+        {canInvite && <Button size="sm" variant="secondary" onClick={onAccess}><MailPlus className="size-4" /> {pending ? 'Resend invite' : 'Invite'}</Button>}
+      </div>
+    </Card>
   )
 }
 
