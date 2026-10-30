@@ -13,6 +13,7 @@ import { FilterBar, SearchInput } from '@/components/ui/toolbar'
 import { downloadCsv, toCsv } from '@/lib/csv'
 import { PAYMENT_METHOD_LABELS } from '@/lib/constants'
 import { formatMoney, summarizeFinancials } from '@/lib/money'
+import { isPendingEligible, pendingAmount } from '@/lib/pending'
 import { addDaysToDateString, fmtDateOnly, todayKey } from '@/lib/time'
 import { useStudio } from '@/features/studio/StudioProvider'
 import { useUrlState } from '@/hooks/useUrlState'
@@ -39,7 +40,9 @@ export default function PaymentsPage() {
         const s = summarizeFinancials(fin.agreed_amount, [{ amount: fin.paid_amount }])
         return { p, fin, s, overdue: !!fin.payment_due_date && fin.payment_due_date < today && s.balance > 0 }
       })
-      .filter((r) => (f.state === 'all' ? true : f.state === 'outstanding' ? r.s.balance > 0 : f.state === 'overdue' ? r.overdue : r.s.balance === 0 && r.s.agreed > 0))
+      // "Outstanding" and "Overdue" follow the same eligibility as the Outstanding figure above and the dashboard's
+      // Pending amount (confirmed events), so the rows listed here always add up to those totals
+      .filter((r) => (f.state === 'all' ? true : f.state === 'outstanding' ? isPendingEligible(r.p) && r.s.balance > 0 : f.state === 'overdue' ? isPendingEligible(r.p) && r.overdue : r.s.balance === 0 && r.s.agreed > 0))
       .filter((r) => !term || [r.p.name, r.p.client_name, r.p.project_code].some((v) => v.toLowerCase().includes(term)))
       .sort((a, b) => Number(b.overdue) - Number(a.overdue) || b.s.balance - a.s.balance)
   }, [financials.data, projects.data, f.q, f.state, today])
@@ -51,7 +54,7 @@ export default function PaymentsPage() {
     return {
       agreed: list.reduce((s, x) => s + Number(x.agreed_amount), 0),
       paid: list.reduce((s, x) => s + Number(x.paid_amount), 0),
-      outstanding: list.reduce((s, x) => s + Math.max(Number(x.balance), 0), 0),
+      outstanding: pendingAmount(projects.data ?? [], financials.data ?? []).total,
       overdue: list.filter((x) => x.payment_due_date && x.payment_due_date < today && Number(x.balance) > 0).length,
     }
   }, [financials.data, projects.data, today])

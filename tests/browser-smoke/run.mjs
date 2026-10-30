@@ -96,7 +96,7 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await page.getByRole('heading', { level: 1 }).waitFor()
   check('dashboard greets the user', /Good (morning|afternoon|evening), Olivia/.test(await page.getByRole('heading', { level: 1 }).innerText()))
   await page.waitForTimeout(600)
-  const kpiLabels = ['Upcoming events', "Today's events", 'Ready for delivery', 'Needs attention']
+  const kpiLabels = ['Upcoming events', "Today's events", 'Ready for delivery', 'Needs attention', 'Pending amount']
   const kpiFound = await Promise.all(kpiLabels.map(async (l) => (await page.getByText(l, { exact: true }).count()) > 0))
   check('dashboard shows the four overview cards', kpiFound.every(Boolean), kpiLabels.filter((_, i) => !kpiFound[i]).join(', '))
   // a card is: <div><p>label</p>…</div><p>value</p>
@@ -114,6 +114,13 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   check('Ready for delivery card links to the Out for Delivery list', (await page.getByRole('link', { name: /Ready for delivery/ }).first().getAttribute('href')) === '/events?stage=out_for_delivery')
   const sideNav = (await page.getByRole('navigation', { name: 'Main' }).getByRole('link').allInnerTexts()).map((s) => s.replace(/\s+\d+$/, '').trim())
   check('sidebar has no Production or Deliveries entries', JSON.stringify(sideNav) === JSON.stringify(['Overview', 'Events', 'Calendar', 'Clients', 'Team', 'Equipment', 'Payments', 'Reports']), sideNav.join(', '))
+  // Pending amount: real balances of confirmed events (Sharma-Rao 1,50,000 + Kapoor 25,000); the inquiry's quote and cancelled events are not owed
+  const pendingCard = page.getByRole('link', { name: /Pending amount/ })
+  const pendingText = await pendingCard.innerText()
+  check('Pending amount shows the total owed across confirmed events, in the studio currency', pendingText.includes('₹1,75,000') && pendingText.includes('Outstanding across 2 events'), pendingText.replace(/\s+/g, ' '))
+  check('Pending amount links to the Payments page filtered to outstanding balances', (await pendingCard.getAttribute('href')) === '/payments?tab=balances&state=outstanding')
+  const heights = await page.evaluate(() => [...document.querySelectorAll('section[aria-label="Key numbers"] :is(a, button)')].map((a) => Math.round(a.getBoundingClientRect().height)))
+  check('Pending amount card is the same height as the other cards', heights.length === 5 && heights.every((h) => Math.abs(h - heights[0]) <= 2), heights.join(', '))
   check('dashboard shows the sidebar section labels', (await page.getByText('Studio management', { exact: false }).count()) > 0 && (await page.getByText('Workspace', { exact: false }).count()) > 0)
   // compact sizing (viewport is 1366x860, so the sidebar is in its normal, not short-screen, form)
   const sizes = await page.evaluate(() => {
@@ -137,6 +144,17 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   check('dashboard shows the unpaid balance as an issue with a clear action', (await page.getByText('Balance payment pending').count()) > 0 && (await page.getByRole('link', { name: /Record payment/ }).count()) > 0)
   check('insights panel says it is rule-based, not AI', (await page.getByText(/not AI-generated/).count()) > 0)
   await shot(page, '02-dashboard')
+  // the dashboard total equals the Payments page: its Outstanding figure and the sum of the balances it lists
+  await pendingCard.click()
+  await page.getByText('Event balances').waitFor()
+  await page.waitForTimeout(500)
+  const rupees = (s) => Number(s.replace(/[^\d.]/g, ''))
+  const outstandingCard = rupees(await page.locator('span', { hasText: /^Outstanding$/ }).first().locator('xpath=../following-sibling::div[1]').innerText())
+  const balances = (await page.locator('table tbody tr').evaluateAll((rows) => rows.map((r) => r.children[4]?.textContent ?? ''))).map(rupees)
+  check('the dashboard total matches the Payments page: its Outstanding figure and the balances it lists', outstandingCard === 175000 && balances.length === 2 && balances.reduce((a, b) => a + b, 0) === 175000, `card=${outstandingCard} rows=${balances.join('+')}`)
+  await page.goto(`${BASE}/`)
+  await page.getByRole('heading', { level: 1 }).waitFor()
+  await page.waitForTimeout(500)
   await featuredCard.click({ position: { x: 40, y: 40 } })
   await page.waitForURL(new RegExp(`/events/${ids.p2}$`))
   check('clicking the featured event opens that event', new URL(page.url()).pathname === `/events/${ids.p2}`)
@@ -358,6 +376,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
   const upcomingCard = await cardValue('Upcoming events')
   check('a finished event is not counted as upcoming, and the card, pipeline and featured card agree', upcomingCard === 0 && (await pipeline('Upcoming')) === 0 && (await page.getByRole('article', { name: 'Featured event' }).count()) === 0, `card=${upcomingCard} pipeline=${await pipeline('Upcoming')}`)
   check('the event shows in the pipeline where it really is: waiting for client approval', (await pipeline('Waiting for Client Approval')) === 1)
+  check('nothing owed shows as zero with an "all settled" message', (await page.getByRole('link', { name: /Pending amount/ }).innerText()).includes('₹0') && (await page.getByText('All payments settled').count()) === 1)
   check('with nothing upcoming the featured area is a compact empty state with a Create event action', (await page.getByText('No upcoming events', { exact: true }).count()) === 1 && (await page.getByText('Create an event and the next one will be featured here.').count()) === 1 && (await page.getByRole('link', { name: 'Create event' }).getAttribute('href')) === '/events/new')
   await shot(page, '02b-dashboard-nothing-upcoming')
 }
@@ -370,7 +389,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
   await page.waitForTimeout(600)
   const nav = await page.getByRole('navigation', { name: 'Main' }).getByRole('link').allInnerTexts()
   check('photographer sees only Overview, Events, Calendar', JSON.stringify(nav.map((s) => s.replace(/\s+\d+$/, '').trim())) === JSON.stringify(['Overview', 'Events', 'Calendar']), nav.join(', '))
-  check('photographer dashboard hides money', (await page.getByText('Outstanding').count()) === 0)
+  check('photographer dashboard hides money', (await page.getByText('Outstanding').count()) === 0 && (await page.getByText('Pending amount').count()) === 0)
   check('photographer dashboard has no "Needs attention" table or insights', (await page.getByText('Needs attention').count()) === 0 && (await page.getByText(/not AI-generated/).count()) === 0)
   await shot(page, '50-photographer-dashboard')
   for (const path of ['/payments', '/clients', '/team', '/reports', '/settings', '/equipment', '/events/new']) {

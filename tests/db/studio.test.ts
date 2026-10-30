@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createDb, type TestDb } from './harness'
+import { pendingAmount } from '../../src/lib/pending'
 
 /**
  * End-to-end checks of the database layer: RLS, role permissions, money maths,
@@ -920,5 +921,113 @@ describe('equipment', () => {
     expect(await t.as(ids.owner, () => t.fails(`delete from public.equipment where id=$1`, [ids.camera]))).toMatch(/permission denied/)
     await q(ids.owner, `update public.equipment set is_active=false where id=$1`, [ids.camera])
     expect(await t.rows(`select 1 from public.event_equipment where equipment_id=$1`, [ids.camera]).then((r) => r.length)).toBeGreaterThan(0)
+  })
+})
+
+describe('pending amount - the finance source of truth', () => {
+  let owner: string
+  let studio: string
+  let client: string
+
+  const kpi = async () =>
+    Number((await q<{ k: { outstanding_amount: string | number | null } }>(owner, `select public.dashboard_kpis($1) as k`, [studio]))[0]!.k.outstanding_amount)
+  const balance = async (project: string) => Number((await t.one<{ balance: string }>(`select balance from public.project_financials where project_id=$1`, [project])).balance)
+  const create = async (name: string, agreed: number, booking = 'confirmed') => {
+    const body = {
+      project: { studio_id: studio, client_id: client, name, event_type: 'wedding', booking_status: booking },
+      finance: { agreed_amount: agreed },
+      initial_payment: null,
+      events: [{ title: 'Session', event_type: 'wedding', starts_at: hours(72), ends_at: hours(78), venue_name: 'Hall', venue_address: 'Pune', assignments: [], equipment: [] }],
+    }
+    const r = await t.as(owner, () => t.db.query<{ save_project: string }>(`select public.save_project($1,$2::jsonb)`, [null, JSON.stringify(body)]))
+    return r.rows[0]!.save_project
+  }
+  const pay = async (project: string, amount: number, allowOver = false) =>
+    (await q<{ id: string }>(owner, `select public.record_payment($1,$2,null,'cash',null,null,false,$3) as id`, [project, amount, allowOver]))[0]!.id
+
+  beforeAll(async () => {
+    owner = await t.newUser('pending-owner@studio.test', 'Penny Owner')
+    studio = (await q<{ create_studio: string }>(owner, `select public.create_studio('Pending Co')`))[0]!.create_studio
+    client = (await q<{ id: string }>(owner, `insert into public.clients (studio_id, full_name, phone) values ($1,'Pending Client','+91 90000 00001') returning id`, [studio]))[0]!.id
+  })
+
+  const a = {} as Record<string, string>
+
+  it('1. is zero with no events and no payments', async () => {
+    expect(await kpi()).toBe(0)
+  })
+
+  it('2. owes the whole amount for an event with no payment', async () => {
+    a.A = await create('Event A', 80000)
+    expect(await balance(a.A)).toBe(80000)
+    expect(await kpi()).toBe(80000)
+  })
+
+  it('3. owes the remainder after a partial payment', async () => {
+    await pay(a.A, 35000)
+    expect(await balance(a.A)).toBe(45000)
+    expect(await kpi()).toBe(45000)
+  })
+
+  it('4. owes nothing once fully paid', async () => {
+    await pay(a.A, 45000)
+    expect(await balance(a.A)).toBe(0)
+    expect(await kpi()).toBe(0)
+  })
+
+  it('5. adds up different balances across events', async () => {
+    a.B = await create('Event B', 50000)
+    a.C = await create('Event C', 30000)
+    await pay(a.B, 10000)
+    expect(await kpi()).toBe(40000 + 30000)
+  })
+
+  it('6. an overpaid event shows a credit but never reduces what other events owe', async () => {
+    a.D = await create('Event D', 10000)
+    await pay(a.D, 25000, true)
+    expect(await balance(a.D)).toBe(-15000)
+    expect(await kpi()).toBe(70000)
+  })
+
+  it('7. ignores cancelled events, inquiries and archived events', async () => {
+    const cancelled = await create('Event E', 99000)
+    await q(owner, `select public.set_booking_status($1,'cancelled','no longer needed')`, [cancelled])
+    await create('Inquiry F', 77000, 'inquiry')
+    const archived = await create('Event G', 55000)
+    await q(owner, `select public.set_project_archived($1, true)`, [archived])
+    expect(await kpi()).toBe(70000)
+  })
+
+  it('8. leaves out void payments and never counts a payment twice', async () => {
+    const extra = await pay(a.B, 20000)
+    expect(await balance(a.B)).toBe(20000) // 50,000 − 10,000 − 20,000
+    expect(await kpi()).toBe(50000)
+    await q(owner, `select public.void_payment($1,'entered on the wrong event')`, [extra])
+    expect(await balance(a.B)).toBe(40000)
+    expect(await kpi()).toBe(70000)
+    await q(owner, `select public.void_payment($1,'again')`, [extra]) // voiding twice changes nothing
+    expect(await kpi()).toBe(70000)
+    expect((await t.rows(`select 1 from public.project_financials where studio_id=$1`, [studio])).length).toBe((await t.rows(`select 1 from public.projects where studio_id=$1`, [studio])).length) // one row per event
+  })
+
+  it('the app\'s rule (src/lib/pending.ts) gives exactly the figure the database reports', async () => {
+    const events = await t.rows<{ id: string; booking_status: 'confirmed' | 'inquiry' | 'cancelled'; archived_at: string | null }>(`select id, booking_status, archived_at from public.projects where studio_id=$1`, [studio])
+    const money = await t.rows<{ project_id: string; agreed_amount: string; paid_amount: string }>(`select project_id, agreed_amount, paid_amount from public.project_financials where studio_id=$1`, [studio])
+    const summary = pendingAmount(events, money.map((m) => ({ project_id: m.project_id, agreed_amount: Number(m.agreed_amount), paid_amount: Number(m.paid_amount) })))
+    expect(summary.total).toBe(await kpi())
+    expect(summary.count).toBe(2) // B and C still owe; A is settled, D is overpaid
+  })
+
+  it('9. keeps every studio separate and money away from people without financial access', async () => {
+    // another studio's owner cannot read this studio's figures, and this studio's total is untouched by theirs
+    expect(await t.as(ids.owner, () => t.fails(`select public.dashboard_kpis($1)`, [studio]))).toMatch(/forbidden/)
+    const mainTotal = Number(((await q<{ k: { outstanding_amount: string | number } }>(ids.owner, `select public.dashboard_kpis($1) as k`, [ids.studio]))[0]!.k).outstanding_amount)
+    expect(mainTotal).not.toBe(70000)
+    // photographers, editors and managers without the finance permission get no figure and no rows
+    for (const user of [ids.photo1, ids.editor, ids.manager]) {
+      expect((await q<{ k: { outstanding_amount: unknown } }>(user, `select public.dashboard_kpis($1) as k`, [ids.studio]))[0]!.k.outstanding_amount).toBeNull()
+      expect(await q(user, `select * from public.project_financials`)).toHaveLength(0)
+    }
+    expect((await q(ids.managerFin, `select * from public.project_financials`)).length).toBeGreaterThan(0)
   })
 })

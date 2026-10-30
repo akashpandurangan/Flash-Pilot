@@ -68,7 +68,7 @@ export function buildDb(role = 'owner') {
     proj(ids.p1, 'FP-0001', 'Sharma–Rao Wedding', clients[0], 'confirmed', 'editing', { production_started_at: iso(-6 * D), shoot_completed_at: iso(-5 * D), editing_started_at: iso(-4 * D), editing_due_date: day(-1), client_approved_at: iso(-4 * D), client_approved_by_name: 'Olivia Mehra', client_approval_note: 'Approved the selection on WhatsApp', production_start_applied_at: iso(-6 * D), production_end_applied_at: iso(-5 * D) }),
     proj(ids.p2, 'FP-0002', 'Mehta Corporate Launch', clients[1], 'confirmed', 'upcoming', { event_type: 'corporate', editing_due_date: null, delivery_due_date: null, editor_id: null }),
     proj(ids.p3, 'FP-0003', 'Nair Maternity Shoot', clients[2], 'inquiry', 'upcoming', { event_type: 'maternity', confirmed_at: null, editor_id: null }),
-    proj(ids.p4, 'FP-0004', 'Kapoor Engagement Shoot', clients[0], 'confirmed', 'awaiting_approval', { event_type: 'engagement', editor_id: ids.meera, production_started_at: iso(-3 * D), shoot_completed_at: iso(-3 * D + 4 * H), production_start_applied_at: iso(-3 * D), production_end_applied_at: iso(-3 * D + 4 * H) }),
+    proj(ids.p4, 'FP-0004', 'Kapoor Engagement Shoot', clients[1], 'confirmed', 'awaiting_approval', { event_type: 'engagement', editor_id: ids.meera, production_started_at: iso(-3 * D), shoot_completed_at: iso(-3 * D + 4 * H), production_start_applied_at: iso(-3 * D), production_end_applied_at: iso(-3 * D + 4 * H) }),
   ]
 
   const events = [
@@ -103,8 +103,8 @@ export function buildDb(role = 'owner') {
   const financials = [
     { project_id: ids.p1, studio_id: ids.studio, agreed_amount: 250000, payment_due_date: day(-3), paid_amount: 100000, balance: 150000 },
     { project_id: ids.p2, studio_id: ids.studio, agreed_amount: 80000, payment_due_date: day(14), paid_amount: 80000, balance: 0 },
-    { project_id: ids.p3, studio_id: ids.studio, agreed_amount: 0, payment_due_date: null, paid_amount: 0, balance: 0 },
-    { project_id: ids.p4, studio_id: ids.studio, agreed_amount: 60000, payment_due_date: day(20), paid_amount: 60000, balance: 0 },
+    { project_id: ids.p3, studio_id: ids.studio, agreed_amount: 30000, payment_due_date: null, paid_amount: 0, balance: 30000 }, // an inquiry: quoted, not owed yet
+    { project_id: ids.p4, studio_id: ids.studio, agreed_amount: 60000, payment_due_date: day(20), paid_amount: 35000, balance: 25000 },
   ]
   const payments = [
     { id: 'd0000000-0000-4000-8000-000000000001', studio_id: ids.studio, project_id: ids.p1, amount: 100000, paid_on: day(-20), method: 'upi', reference: 'UTR1234567', notes: null, is_advance: true, status: 'valid', voided_at: null, void_reason: null, recorded_by_name: 'Olivia Mehra', created_at: iso(-20 * D), project: { id: ids.p1, name: 'Sharma–Rao Wedding', project_code: 'FP-0001' } },

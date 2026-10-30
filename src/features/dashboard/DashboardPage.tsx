@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { formatDistanceToNowStrict } from 'date-fns'
-import { Camera, CalendarCheck, Clapperboard, Contact, Plus, TriangleAlert, UsersRound } from 'lucide-react'
+import { Camera, CalendarCheck, Clapperboard, Contact, Plus, TriangleAlert, UsersRound, Wallet } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { getDashboardKpis } from '@/api/dashboard'
@@ -15,6 +15,7 @@ import { MetricCard } from '@/components/ui/metric-card'
 import { buildActionItems, countAttentionEvents } from '@/lib/alerts'
 import { attentionHeadline, buildInsights, computeEventKpis, pickFeaturedEvent, pipelineCounts, todaysEvents } from '@/lib/dashboard'
 import { formatMoney } from '@/lib/money'
+import { pendingAmount } from '@/lib/pending'
 import { toConflictEvent } from '@/lib/schedule'
 import { todayKey, zonedDayBounds } from '@/lib/time'
 import { cn, pluralize } from '@/lib/utils'
@@ -65,9 +66,10 @@ export default function DashboardPage() {
     })
   }, [isStaff, schedule.data, projects.data, financials.data, inventory.data, canFinance, tz, currency])
 
-  const k = kpis.data
   const derived = useMemo(() => computeEventKpis(events, items, clock), [events, items, clock])
   const today = useMemo(() => todaysEvents(schedule.data ?? [], tz, clock), [schedule.data, tz, clock])
+  // the same rule and the same rows as the Payments page, so the two totals always match
+  const pending = useMemo(() => pendingAmount(events, financials.data ?? []), [events, financials.data])
   const stages = useMemo(() => pipelineCounts(events, clock), [events, clock])
   const insights = useMemo(() => buildInsights(items, events, clock), [items, events, clock])
   const attentionEvents = countAttentionEvents(items)
@@ -130,7 +132,7 @@ export default function DashboardPage() {
             <Card className="rounded-panel p-4 sm:p-5">
               <h2 className="mb-3 px-0.5 text-[17px] font-semibold tracking-tight">Studio overview</h2>
               <div className={cn('grid grid-cols-2 gap-3 md:grid-cols-4', loading || featured ? 'xl:grid-cols-2' : 'xl:grid-cols-4')}>
-                {cardsLoading ? Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-28 rounded-card" />) : (
+                {cardsLoading ? Array.from({ length: canFinance ? 5 : 4 }, (_, i) => <Skeleton key={i} className={cn('h-28 rounded-card', canFinance && i === 4 && 'col-span-full')} />) : (
                   <>
                     <MetricCard tone="dark" label="Upcoming events" value={derived.upcoming} hint={`${derived.upcomingNext7} in the next 7 days`} to="/events?stage=upcoming" />
                     <MetricCard
@@ -144,12 +146,24 @@ export default function DashboardPage() {
                       <MetricCard
                         label="Needs attention"
                         value={attentionEvents}
-                        hint={canFinance && k?.outstanding_amount ? `${formatMoney(k.outstanding_amount, currency)} outstanding` : attentionEvents === 0 ? 'All clear' : 'Events with open issues'}
+                        hint={attentionEvents === 0 ? 'All clear' : 'Events with open issues'}
                         onClick={scrollToAttention}
                       />
                     ) : (
                       <MetricCard label="Assigned this week" value={sessionsThisWeek} hint="Sessions in the next 7 days" to="/calendar?view=list" />
                     )}
+                    {/* money is only ever loaded for people with financial access, so everyone else simply has four cards */}
+                    {canFinance && (financials.isLoading ? <Skeleton className="col-span-full h-28 rounded-card" /> : (
+                      <MetricCard
+                        tone="accent"
+                        className="col-span-full"
+                        icon={<Wallet />}
+                        label="Pending amount"
+                        value={financials.isError ? '—' : formatMoney(pending.total, currency)}
+                        hint={financials.isError ? 'Could not load payments' : pending.count === 0 ? 'All payments settled' : `Outstanding across ${pluralize(pending.count, 'event')}`}
+                        to="/payments?tab=balances&state=outstanding"
+                      />
+                    ))}
                   </>
                 )}
               </div>

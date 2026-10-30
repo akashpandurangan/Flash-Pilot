@@ -82,6 +82,13 @@ balance = agreed_amount − Σ(payments where status = 'valid')      -- view pro
 `allow_overpayment` is passed**; a confirmed overpayment simply yields a negative balance, shown as *credit*.
 Payments are voided (kept, marked, excluded) rather than deleted.
 
+**Pending amount** (the dashboard card, the Payments page's *Outstanding* figure and its Outstanding/Overdue lists,
+Reports, and `dashboard_kpis().outstanding_amount`) is one rule, implemented once in `src/lib/pending.ts`: the sum of
+`max(balance, 0)` over **confirmed, non-archived** events. Cancelled events and inquiries are not owed anything yet,
+and an overpaid event owes nothing without cancelling out another event's balance. It is recomputed from payment
+records every time (never stored), is only loaded for people with financial access, and `tests/db` checks the SQL
+figure against the TypeScript rule.
+
 ### Time zones
 
 Instants are stored in UTC. All entry and display uses the *studio's* zone (`date-fns-tz`), so "9:00 AM" means
