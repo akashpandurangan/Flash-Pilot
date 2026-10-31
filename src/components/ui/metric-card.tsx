@@ -4,19 +4,30 @@ import { Link } from 'react-router'
 import { cn } from '@/lib/utils'
 
 /**
+ * Rough width of a figure in em, so it can be sized to fit its card. Digits (and currency symbols) are ~0.62em in
+ * Inter's tabular figures, separators are narrow; a little headroom is added so it never touches the edge.
+ */
+function figureWidthEm(text: string): number {
+  let em = 0
+  for (const ch of text) em += /[\d₹$€£]/.test(ch) ? 0.66 : /[,.\s]/.test(ch) ? 0.32 : 0.8
+  return Math.max(em, 0.66)
+}
+
+/**
  * A key number. The first card on a dashboard is `dark` (near-black, white text); the rest are `soft`, and
  * one card can carry the lime `accent` tone (a pale lime wash, not the full lime used for active states).
  * With `to`, the whole card is a link to the list behind the number.
+ *
+ * The figure is at most 38px but shrinks to fit when it is long (e.g. ₹12,50,000 in a narrow card), so a
+ * row of equal cards never overflows and short numbers all keep the same size.
  */
-export function MetricCard({ label, value, hint, tone = 'soft', compact, icon, to, onClick, className }: {
+export function MetricCard({ label, value, hint, tone = 'soft', compact, to, onClick, className }: {
   label: string
   value: ReactNode
   hint?: ReactNode
   tone?: 'dark' | 'soft' | 'accent'
   /** Smaller figure, for long values such as amounts of money that would not fit a narrow card. */
   compact?: boolean
-  /** Decoration on the right of a wide card; hidden on phones. */
-  icon?: ReactNode
   to?: string
   /** Use instead of `to` for an in-page action (e.g. scrolling to a section). */
   onClick?: () => void
@@ -24,20 +35,26 @@ export function MetricCard({ label, value, hint, tone = 'soft', compact, icon, t
 }) {
   const dark = tone === 'dark'
   const accent = tone === 'accent'
+  const max = compact ? 28 : 38
+  const text = typeof value === 'string' || typeof value === 'number' ? String(value) : null
   const body = (
     <>
-      <div className="flex items-start justify-between gap-2">
-        <p className={cn('text-[13px]', dark ? 'text-white/70' : accent ? 'text-accent-ink' : 'text-ink-muted')}>{label}</p>
-        {(to || onClick) && <ArrowUpRight className={cn('size-4 shrink-0 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5', dark ? 'text-white/60' : accent ? 'text-accent-ink/70' : 'text-ink-faint')} aria-hidden />}
-      </div>
+      <p className={cn('text-[13px] leading-tight', (to || onClick) && 'pr-4', dark ? 'text-white/70' : accent ? 'text-accent-ink' : 'text-ink-muted')}>{label}</p>
+      {(to || onClick) && <ArrowUpRight className={cn('absolute right-3 top-4 size-4 shrink-0 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 sm:top-[18px]', dark ? 'text-white/60' : accent ? 'text-accent-ink/70' : 'text-ink-faint')} aria-hidden />}
       {/* leading-none must come after the size: tailwind-merge drops an earlier leading-* when a text-size follows it */}
-      <p className={cn(compact ? 'text-2xl sm:text-[28px]' : 'text-[34px] sm:text-[38px]', 'mt-2 font-semibold leading-none tracking-tight tabular-nums')}>{value}</p>
+      <div className="mt-2" style={{ containerType: 'inline-size' }}>
+        <p
+          className="whitespace-nowrap font-semibold leading-none tracking-tight tabular-nums"
+          style={{ fontSize: text ? `min(${max}px, calc(100cqw / ${figureWidthEm(text).toFixed(2)}))` : `${max}px` }}
+        >
+          {value}
+        </p>
+      </div>
       {hint && <p className={cn('mt-2 text-xs leading-snug', dark ? 'text-white/70' : accent ? 'text-accent-ink' : 'text-ink-muted')}>{hint}</p>}
-      {icon && <span className="absolute right-5 top-1/2 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full bg-accent text-ink sm:flex [&>svg]:size-5" aria-hidden>{icon}</span>}
     </>
   )
   const cls = cn(
-    'group relative block min-w-0 rounded-card p-4 transition-colors sm:p-[18px]',
+    'group relative block min-w-0 rounded-card p-4 transition-colors sm:p-[18px] xl:p-4 min-[1400px]:p-[18px]',
     dark ? 'on-dark bg-dark text-white' : accent ? 'bg-accent-soft text-ink ring-1 ring-accent/70' : 'bg-subtle text-ink',
     (to || onClick) && (dark ? 'hover:bg-dark-soft' : accent ? 'hover:bg-accent/40' : 'hover:bg-line/70'),
     className,

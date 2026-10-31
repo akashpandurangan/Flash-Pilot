@@ -28,11 +28,11 @@ export function EventPipeline({ counts }: { counts: Partial<Record<ProductionSta
       <p className="mt-0.5 text-xs text-ink-muted">{total === 0 ? 'No events in the pipeline yet' : `${total} ${total === 1 ? 'event' : 'events'} by stage`}</p>
 
       <div className="-mx-1 mt-3.5 overflow-x-auto px-1 pb-1 scrollbar-thin">
-        <ol className="flex min-w-[390px] gap-1.5" aria-label="Events by production stage">
+        <ol className="flex min-w-[366px] gap-1.5 sm:min-w-[558px]" aria-label="Events by production stage">
           {segments.map((s) => {
             const selected = active === s.stage
             return (
-              <li key={s.stage} className="min-w-[60px]" style={{ flexGrow: segmentWeight(s, segments), flexBasis: 0 }}>
+              <li key={s.stage} className="min-w-[56px] sm:min-w-[88px]" style={{ flexGrow: segmentWeight(s, segments), flexBasis: 0 }}>
                 <Link
                   to={`/events?stage=${s.stage}`}
                   onMouseEnter={() => setPicked(s.stage)}

@@ -60,7 +60,7 @@ export function FeaturedEventCard({ event, detail, tasks, detailLoading, tz }: {
 
   return (
     <article className="group relative flex h-full flex-col rounded-panel border border-line bg-surface p-1.5 shadow-card" aria-label="Featured event">
-      <div className="relative flex min-h-[10.5rem] flex-1">
+      <div className="relative flex min-h-[12rem] flex-1">
         <div className="relative w-full overflow-hidden rounded-[18px] bg-dark" aria-hidden>
           <div
             className="absolute inset-0"

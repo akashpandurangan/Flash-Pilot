@@ -96,13 +96,13 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   await page.getByRole('heading', { level: 1 }).waitFor()
   check('dashboard greets the user', /Good (morning|afternoon|evening), Olivia/.test(await page.getByRole('heading', { level: 1 }).innerText()))
   await page.waitForTimeout(600)
-  const kpiLabels = ['Upcoming events', "Today's events", 'Ready for delivery', 'Needs attention', 'Pending amount']
+  const kpiLabels = ['Upcoming events', "Today's events", 'Editing in progress', 'Ready for delivery', 'Pending amount']
   const kpiFound = await Promise.all(kpiLabels.map(async (l) => (await page.getByText(l, { exact: true }).count()) > 0))
   check('dashboard shows the four overview cards', kpiFound.every(Boolean), kpiLabels.filter((_, i) => !kpiFound[i]).join(', '))
   // a card is: <div><p>label</p>…</div><p>value</p>
-  const cardValue = async (label) => Number(await page.locator('p', { hasText: new RegExp(`^${label}$`) }).first().locator('xpath=../following-sibling::p[1]').innerText())
-  const [upcomingN, attentionN] = [await cardValue('Upcoming events'), await cardValue('Needs attention')]
-  check('dashboard overview numbers come from the API (upcoming and attention counts are non-zero)', upcomingN > 0 && attentionN > 0, `upcoming=${upcomingN} attention=${attentionN}`)
+  const cardValue = async (label) => Number(await page.locator('p', { hasText: new RegExp(`^${label}$`) }).first().locator('xpath=following-sibling::div[1]/p').innerText())
+  const [upcomingN, editingN] = [await cardValue('Upcoming events'), await cardValue('Editing in progress')]
+  check('dashboard overview numbers come from the API (upcoming and editing counts match the records)', upcomingN === 2 && editingN === 1, `upcoming=${upcomingN} editing=${editingN}`)
   // one definition of "upcoming" everywhere: the card, the pipeline and the featured event must agree
   const pipelineUpcoming = Number(/: (\d+) event/.exec(await page.getByRole('link', { name: /^Upcoming: \d+ events?$/ }).getAttribute('aria-label'))?.[1])
   check('pipeline "Upcoming" matches the Upcoming events card', pipelineUpcoming === upcomingN, `pipeline=${pipelineUpcoming} card=${upcomingN}`)
@@ -114,6 +114,20 @@ const shot = (page, name) => page.screenshot({ path: `${OUT}${name}.png`, fullPa
   check('Ready for delivery card links to the Out for Delivery list', (await page.getByRole('link', { name: /Ready for delivery/ }).first().getAttribute('href')) === '/events?stage=out_for_delivery')
   const sideNav = (await page.getByRole('navigation', { name: 'Main' }).getByRole('link').allInnerTexts()).map((s) => s.replace(/\s+\d+$/, '').trim())
   check('sidebar has no Production or Deliveries entries', JSON.stringify(sideNav) === JSON.stringify(['Overview', 'Events', 'Calendar', 'Clients', 'Team', 'Equipment', 'Payments', 'Reports']), sideNav.join(', '))
+  // the five cards, in order, with their supporting text, colours and links
+  const kpiCards = await page.evaluate(() => [...document.querySelectorAll('section[aria-label="Key numbers"] :is(a, button)')].map((el) => ({
+    text: [...el.querySelectorAll('p')].map((p) => p.textContent.trim()), href: el.getAttribute('href'), bg: getComputedStyle(el).backgroundColor,
+  })))
+  check('Studio overview has exactly five cards in the requested order', JSON.stringify(kpiCards.map((c) => c.text[0])) === JSON.stringify(['Upcoming events', "Today's events", 'Editing in progress', 'Ready for delivery', 'Pending amount']), kpiCards.map((c) => c.text[0]).join(', '))
+  check('Needs attention is no longer a Studio overview card', !kpiCards.some((c) => /Needs attention/i.test(c.text[0])) && (await page.getByText('Assigned this week').count()) === 0)
+  check('cards show the requested supporting text', kpiCards[0].text[2] === '1 in the next 7 days' && kpiCards[1].text[2] === '0 sessions scheduled today' && kpiCards[2].text[2] === 'Events currently being edited' && kpiCards[3].text[2] === 'Ready to deliver to clients' && kpiCards[4].text[2] === 'Outstanding across 2 events', kpiCards.map((c) => c.text[2]).join(' | '))
+  check('Editing in progress counts only the Editing stage (the event waiting for approval is not included)', kpiCards[2].text[1] === '1', kpiCards[2].text[1])
+  check('click-through links are unchanged', kpiCards[0].href === '/events?stage=upcoming' && /^\/events\?from=\d{4}-\d\d-\d\d&to=\d{4}-\d\d-\d\d$/.test(kpiCards[1].href) && kpiCards[2].href === '/events?stage=editing' && kpiCards[3].href === '/events?stage=out_for_delivery' && kpiCards[4].href === '/payments?tab=balances&state=outstanding', kpiCards.map((c) => c.href).join(' '))
+  const rgb = (s) => s.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number)
+  const [black, grey1, grey2, grey3, lime] = kpiCards.map((c) => rgb(c.bg))
+  check('Upcoming is black, Pending amount is pale lime, the other three are the same light grey', black.every((v) => v < 40) && grey1.join() === grey2.join() && grey2.join() === grey3.join() && grey1.every((v) => v > 225) && lime[1] > lime[2] + 20 && lime[1] > 235, kpiCards.map((c) => c.bg).join(' | '))
+  const desktopLayout = await page.evaluate(() => [...document.querySelectorAll('section[aria-label="Key numbers"] :is(a, button)')].map((el) => { const r = el.getBoundingClientRect(); return { y: Math.round(r.y), w: Math.round(r.width) } }))
+  check('all five cards sit in one equal-width row on desktop', new Set(desktopLayout.map((c) => c.y)).size === 1 && desktopLayout.every((c) => Math.abs(c.w - desktopLayout[0].w) <= 1), JSON.stringify(desktopLayout))
   // Pending amount: real balances of confirmed events (Sharma-Rao 1,50,000 + Kapoor 25,000); the inquiry's quote and cancelled events are not owed
   const pendingCard = page.getByRole('link', { name: /Pending amount/ })
   const pendingText = await pendingCard.innerText()
@@ -337,6 +351,23 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.waitForTimeout(600)
     const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     check(`${width}px: ${path === '/' ? 'dashboard' : path.replace(ids.p1, ':id')} has no horizontal page scroll`, over <= 1, `overflow ${over}px`)
+    if (path === '/') {
+      await page.locator('section[aria-label="Key numbers"] a').nth(4).waitFor() // the cards, not their loading skeletons
+      // the five cards: one equal row from 1280px, three over two on tablets, two columns with a full-width last card on phones
+      const cards = await page.evaluate(() => [...document.querySelectorAll('section[aria-label="Key numbers"] :is(a, button)')].map((el) => {
+        const r = el.getBoundingClientRect()
+        const fig = el.querySelector('p.leading-none')
+        return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height), clipped: !!fig && fig.scrollWidth > fig.parentElement.clientWidth + 1, label: el.querySelector('p')?.textContent ?? '' }
+      }))
+      const rows = new Set(cards.map((c) => c.y)).size
+      const equalWidths = cards.every((c) => Math.abs(c.w - cards[0].w) <= 1)
+      const expected = width >= 1280 ? 'one equal-width row' : width >= 768 ? 'two rows' : 'three rows'
+      const ok = cards.length === 5 && !cards.some((c) => c.clipped)
+        && (width >= 1280 ? rows === 1 && equalWidths : width >= 768 ? rows === 2 : rows === 3)
+      check(`${width}px: the five Studio overview cards sit in ${expected} and no figure is clipped`, ok, cards.map((c) => `${c.label.trim()} ${c.w}x${c.h}@${c.x},${c.y}${c.clipped ? ' CLIPPED' : ''}`).join(' | '))
+      if (width >= 1280) check(`${width}px: the five cards have the same height`, cards.every((c) => Math.abs(c.h - cards[0].h) <= 1), cards.map((c) => c.h).join(', '))
+      await shot(page, `46-dashboard-${width}`)
+    }
   }
   if (width === 1440) await shot(page, '45-wide-reports')
   await page.close()
@@ -371,7 +402,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
   await login(page)
   await page.getByRole('heading', { level: 1 }).waitFor()
   await page.waitForTimeout(700)
-  const cardValue = async (label) => Number(await page.locator('p', { hasText: new RegExp(`^${label}$`) }).first().locator('xpath=../following-sibling::p[1]').innerText())
+  const cardValue = async (label) => Number(await page.locator('p', { hasText: new RegExp(`^${label}$`) }).first().locator('xpath=following-sibling::div[1]/p').innerText())
   const pipeline = async (name) => Number(/: (\d+) event/.exec(await page.getByRole('link', { name: new RegExp(`^${name}: \\d+ events?$`) }).getAttribute('aria-label'))?.[1])
   const upcomingCard = await cardValue('Upcoming events')
   check('a finished event is not counted as upcoming, and the card, pipeline and featured card agree', upcomingCard === 0 && (await pipeline('Upcoming')) === 0 && (await page.getByRole('article', { name: 'Featured event' }).count()) === 0, `card=${upcomingCard} pipeline=${await pipeline('Upcoming')}`)

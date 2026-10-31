@@ -129,8 +129,26 @@ describe('dashboard numbers', () => {
     expect(k.needsAttention).toBe(2)
   })
 
+  it('counts Editing in progress by the current stage only: not waiting for approval, not out for delivery, not cancelled', () => {
+    const events = [
+      ev('e1', { production_stage: 'editing', start: -20 }),
+      ev('e2', { production_stage: 'editing', start: -20 }),
+      ev('wait', { production_stage: 'awaiting_approval', start: -20 }),
+      ev('out', { production_stage: 'out_for_delivery', start: -20 }),
+      ev('done', { production_stage: 'delivered', start: -20 }),
+      ev('shot', { start: -4 }), // stored as upcoming but over: waiting for approval, not editing
+      ev('prod', { production_stage: 'production', start: -0.5 }),
+      ev('cancelled', { production_stage: 'editing', start: -20, booking_status: 'cancelled' }),
+      ev('archived', { production_stage: 'editing', start: -20, archived_at: at(-1) }),
+    ]
+    const k = computeEventKpis(events, [], NOW)
+    expect(k.editing).toBe(2)
+    expect(k.readyForDelivery).toBe(1)
+    expect(pipelineCounts(events, NOW)).toMatchObject({ editing: 2, out_for_delivery: 1, awaiting_approval: 2 }) // the pipeline agrees with the card
+  })
+
   it('is all zeros for an empty studio', () => {
-    expect(computeEventKpis([], [], NOW)).toEqual({ upcoming: 0, upcomingNext7: 0, readyForDelivery: 0, needsAttention: 0 })
+    expect(computeEventKpis([], [], NOW)).toEqual({ upcoming: 0, upcomingNext7: 0, editing: 0, readyForDelivery: 0, needsAttention: 0 })
     expect(pipelineCounts([], NOW)).toEqual({ upcoming: 0, production: 0, awaiting_approval: 0, editing: 0, out_for_delivery: 0, delivered: 0 })
   })
 

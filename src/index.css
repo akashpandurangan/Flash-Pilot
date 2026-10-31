@@ -112,9 +112,9 @@
 }
 
 /*
-  Dashboard composition. One column on small screens, then a two-column magazine layout:
-  the featured event sits beside the key numbers and pipeline, the "needs attention" table runs
-  the full width (it has six columns), and insights sit beside the activity feed.
+  Dashboard composition. One column on small screens, then from 1280px: the key numbers and the
+  pipeline across the full width, the featured event (~55%) beside the insights (~45%), and the
+  "needs attention" table (six columns) and activity feed at full width.
 */
 .dash-grid {
   display: grid;
@@ -125,24 +125,19 @@
 @media (min-width: 1280px) {
   .dash-grid {
     gap: 1.25rem;
-    /* featured event ~55%, studio overview ~45% */
     grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr);
     grid-template-areas:
-      'featured kpi'
-      'featured pipeline'
+      'kpi kpi'
+      'pipeline pipeline'
+      'featured insights'
       'attention attention'
-      'insights activity';
+      'activity activity';
   }
 }
 /* people without management access get no attention / insights panels */
 .dash-grid--crew { grid-template-areas: 'kpi' 'featured' 'pipeline' 'activity'; }
 @media (min-width: 1280px) {
-  .dash-grid--crew { grid-template-areas: 'featured kpi' 'featured pipeline' 'activity activity'; }
-}
-/* nothing to feature: the numbers run full width and the short empty state sits beside the pipeline */
-@media (min-width: 1280px) {
-  .dash-grid--no-featured { grid-template-areas: 'kpi kpi' 'featured pipeline' 'attention attention' 'insights activity'; }
-  .dash-grid--crew.dash-grid--no-featured { grid-template-areas: 'kpi kpi' 'featured pipeline' 'activity activity'; }
+  .dash-grid--crew { grid-template-areas: 'kpi kpi' 'pipeline pipeline' 'featured activity'; }
 }
 .dash-kpi { grid-area: kpi; min-width: 0; }
 .dash-featured { grid-area: featured; min-width: 0; }

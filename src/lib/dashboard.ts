@@ -78,6 +78,8 @@ export interface EventKpis {
   upcoming: number
   /** ...of which start within 7 days. */
   upcomingNext7: number
+  /** Events whose current stage is Editing - not Waiting for Client Approval, not Out for Delivery. */
+  editing: number
   /** Events at the Out for Delivery stage (the final hand-over step before Delivered). */
   readyForDelivery: number
   needsAttention: number
@@ -89,6 +91,7 @@ export function computeEventKpis(events: EventLite[], attention: ActionItem[], n
   return {
     upcoming: upcoming.length,
     upcomingNext7: upcoming.filter((e) => e.first_event_at && new Date(e.first_event_at).getTime() - t <= 7 * DAY).length,
+    editing: events.filter((e) => isLive(e) && e.booking_status === 'confirmed' && effectiveStage(e, now) === 'editing').length,
     readyForDelivery: events.filter((e) => isLive(e) && e.booking_status === 'confirmed' && effectiveStage(e, now) === 'out_for_delivery').length,
     needsAttention: countAttentionEvents(attention),
   }

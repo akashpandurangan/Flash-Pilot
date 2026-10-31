@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createDb, type TestDb } from './harness'
+import { computeEventKpis, todaysEvents } from '../../src/lib/dashboard'
 import { pendingAmount } from '../../src/lib/pending'
 
 /**
@@ -1029,5 +1030,104 @@ describe('pending amount - the finance source of truth', () => {
       expect(await q(user, `select * from public.project_financials`)).toHaveLength(0)
     }
     expect((await q(ids.managerFin, `select * from public.project_financials`)).length).toBeGreaterThan(0)
+  })
+})
+
+describe('the five Studio overview cards match the database', () => {
+  let owner: string
+  let studio: string
+  let client: string
+  const ev = {} as Record<string, string>
+
+  type Sess = { title?: string; starts: string; ends: string }
+  const create = async (name: string, sessions: Sess[], agreed = 0, booking = 'confirmed') => {
+    const body = {
+      project: { studio_id: studio, client_id: client, name, event_type: 'wedding', booking_status: booking },
+      finance: { agreed_amount: agreed },
+      initial_payment: null,
+      events: sessions.map((s, i) => ({ title: s.title ?? `Session ${i + 1}`, event_type: 'wedding', starts_at: s.starts, ends_at: s.ends, venue_name: 'Hall', venue_address: 'Pune', assignments: [], equipment: [] })),
+    }
+    const r = await t.as(owner, () => t.db.query<{ save_project: string }>(`select public.save_project($1,$2::jsonb)`, [null, JSON.stringify(body)]))
+    return r.rows[0]!.save_project
+  }
+  const run = (project: string, ...actions: string[]) => actions.reduce((p, a) => p.then(() => q(owner, `select public.project_workflow_action($1,$2)`, [project, a]).then(() => undefined)), Promise.resolve())
+  const soon = (h: number): Sess => ({ starts: hours(h), ends: hours(h + 4) })
+
+  beforeAll(async () => {
+    owner = await t.newUser('kpi-owner@studio.test', 'Kay Owner')
+    studio = (await q<{ create_studio: string }>(owner, `select public.create_studio('KPI Co')`))[0]!.create_studio
+    client = (await q<{ id: string }>(owner, `insert into public.clients (studio_id, full_name, phone) values ($1,'KPI Client','+91 90000 00002') returning id`, [studio]))[0]!.id
+
+    // today (studio zone, Asia/Kolkata): two sessions of one event, at 12:00 and 16:00 local time
+    const noon = new Date((await t.one<{ t: string | Date }>(`select ((date_trunc('day', now() at time zone 'Asia/Kolkata') + interval '12 hours') at time zone 'Asia/Kolkata') as t`)).t)
+    const at = (addHours: number) => new Date(noon.getTime() + addHours * 3_600_000).toISOString()
+
+    ev.upcomingSoon = await create('Upcoming in 3 days', [soon(72)], 50000)
+    await q(owner, `select public.record_payment($1, 20000)`, [ev.upcomingSoon]) // partial: owes 30,000
+    ev.upcomingLater = await create('Upcoming in 20 days', [soon(24 * 20)])
+    ev.inquiry = await create('Inquiry in 5 days', [soon(24 * 5)], 0, 'inquiry')
+    ev.today = await create('Shooting today', [{ starts: at(0), ends: at(2) }, { starts: at(4), ends: at(6) }])
+    await run(ev.today, 'start_production') // started by hand, so it is not "upcoming" whatever the time of day
+    ev.editing = await create('Editing', [soon(72)], 40000) // owes 40,000
+    await run(ev.editing, 'start_production', 'complete_shoot', 'approve_client')
+    ev.waiting = await create('Waiting for approval', [soon(72)])
+    await run(ev.waiting, 'start_production', 'complete_shoot')
+    ev.out = await create('Out for delivery', [soon(72)])
+    await run(ev.out, 'start_production', 'complete_shoot', 'approve_client', 'complete_editing', 'mark_out_for_delivery')
+    ev.delivered = await create('Delivered', [soon(72)])
+    await run(ev.delivered, 'start_production', 'complete_shoot', 'approve_client', 'complete_editing', 'mark_out_for_delivery', 'mark_delivered')
+    ev.cancelledEditing = await create('Cancelled while editing', [soon(72)], 90000)
+    await run(ev.cancelledEditing, 'start_production', 'complete_shoot', 'approve_client')
+    await q(owner, `select public.set_booking_status($1,'cancelled','client withdrew')`, [ev.cancelledEditing])
+  })
+
+  const rpc = async () =>
+    (await q<{ k: Record<string, unknown> & { stage_counts: Record<string, number> } }>(owner, `select public.dashboard_kpis($1) as k`, [studio]))[0]!.k
+  const fromApp = async () => {
+    const events = (await q<{ r: Parameters<typeof computeEventKpis>[0][number] }>(owner, `select row_to_json(o) as r from public.project_overview o where o.studio_id=$1`, [studio])).map((x) => x.r)
+    const sessions = (await q<{ r: Parameters<typeof todaysEvents>[0][number] }>(owner, `
+      select json_build_object('starts_at', e.starts_at, 'project', json_build_object('id', p.id, 'booking_status', p.booking_status, 'archived_at', p.archived_at)) as r
+        from public.project_events e join public.projects p on p.id = e.project_id where e.studio_id=$1 and e.cancelled_at is null`, [studio])).map((x) => x.r)
+    const fin = (await q<{ project_id: string; agreed_amount: string; paid_amount: string }>(owner, `select project_id, agreed_amount, paid_amount from public.project_financials where studio_id=$1`, [studio]))
+      .map((f) => ({ project_id: f.project_id, agreed_amount: Number(f.agreed_amount), paid_amount: Number(f.paid_amount) }))
+    const now = new Date()
+    return { kpis: computeEventKpis(events, [], now), today: todaysEvents(sessions, 'Asia/Kolkata', now), pending: pendingAmount(events, fin) }
+  }
+
+  it('Upcoming Events: every event not yet started, not cancelled - with how many start within 7 days', async () => {
+    const { kpis } = await fromApp()
+    const db = await rpc()
+    expect(kpis.upcoming).toBe(3) // in 3 days, in 20 days, and the inquiry
+    expect(kpis.upcomingNext7).toBe(2) // 3 days and 5 days
+    expect(Number(db.upcoming_events)).toBe(kpis.upcoming)
+    expect(Number(db.upcoming_next_7_days)).toBe(kpis.upcomingNext7)
+  })
+
+  it("Today's Events: events (and sessions) starting today in the studio's time zone", async () => {
+    const { today } = await fromApp()
+    expect(today).toEqual({ events: 1, sessions: 2 })
+    expect(Number((await rpc()).today_events)).toBe(today.events)
+  })
+
+  it('Editing in Progress: only events whose current stage is Editing', async () => {
+    const { kpis } = await fromApp()
+    const stored = await t.one<{ n: number }>(`select count(*)::int as n from public.projects where studio_id=$1 and production_stage='editing' and booking_status='confirmed' and archived_at is null`, [studio])
+    expect(kpis.editing).toBe(1) // not "waiting for approval", not "out for delivery", not delivered, not the cancelled one
+    expect(stored.n).toBe(kpis.editing)
+    expect((await rpc()).stage_counts.editing).toBe(kpis.editing)
+  })
+
+  it('Ready for Delivery: events at the Out for Delivery stage', async () => {
+    const { kpis } = await fromApp()
+    const stored = await t.one<{ n: number }>(`select count(*)::int as n from public.projects where studio_id=$1 and production_stage='out_for_delivery' and booking_status='confirmed' and archived_at is null`, [studio])
+    expect(kpis.readyForDelivery).toBe(1)
+    expect(stored.n).toBe(kpis.readyForDelivery)
+    expect(Number((await rpc()).ready_for_delivery)).toBe(kpis.readyForDelivery)
+  })
+
+  it('Pending Amount: what is still owed on confirmed events, from the payment records', async () => {
+    const { pending } = await fromApp()
+    expect(pending).toMatchObject({ total: 30000 + 40000, count: 2 }) // the cancelled event owes nothing, the inquiry has no quote
+    expect(Number((await rpc()).outstanding_amount)).toBe(pending.total)
   })
 })

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { formatDistanceToNowStrict } from 'date-fns'
-import { Camera, CalendarCheck, Clapperboard, Contact, Plus, TriangleAlert, UsersRound, Wallet } from 'lucide-react'
+import { Camera, CalendarCheck, Clapperboard, Contact, Plus, TriangleAlert, UsersRound } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { getDashboardKpis } from '@/api/dashboard'
@@ -74,15 +74,12 @@ export default function DashboardPage() {
   const insights = useMemo(() => buildInsights(items, events, clock), [items, events, clock])
   const attentionEvents = countAttentionEvents(items)
 
-  // sessions assigned in the next 7 days - the fourth card for people who don't manage the studio
-  const sessionsThisWeek = useMemo(
-    () => (schedule.data ?? []).filter((s) => s.project.booking_status !== 'cancelled' && new Date(s.starts_at).getTime() - now <= 7 * 86_400_000 && new Date(s.ends_at).getTime() >= now).length,
-    [schedule.data, now],
-  )
-
   const loading = kpis.isLoading || projects.isLoading
   // "Today's events" comes from the schedule query, so the cards wait for it rather than flashing a 0
   const cardsLoading = loading || schedule.isLoading
+  // card slots: five (with Pending amount) or four. Three over two on tablets, one equal row from 1280px, a full-width last card on phones.
+  const kpiCount = canFinance ? 5 : 4
+  const slot = (i: number) => (canFinance ? cn(i < 3 ? 'md:col-span-2' : 'md:col-span-3', i === 4 && 'col-span-2', 'xl:col-span-1') : undefined)
   const brandNew = !loading && !kpis.isError && !projects.isError && events.length === 0
   const updatedAt = Math.max(schedule.dataUpdatedAt, projects.dataUpdatedAt, 0)
   const updatedLabel = updatedAt ? ago(updatedAt, now) : undefined
@@ -127,37 +124,30 @@ export default function DashboardPage() {
       )}
 
       {brandNew ? <GettingStarted canManage={isStaff} /> : (
-        <div className={cn('dash-grid', !isStaff && 'dash-grid--crew', !loading && !featured && 'dash-grid--no-featured')}>
+        <div className={cn('dash-grid', !isStaff && 'dash-grid--crew')}>
           <section className="dash-kpi" aria-label="Key numbers">
             <Card className="rounded-panel p-4 sm:p-5">
               <h2 className="mb-3 px-0.5 text-[17px] font-semibold tracking-tight">Studio overview</h2>
-              <div className={cn('grid grid-cols-2 gap-3 md:grid-cols-4', loading || featured ? 'xl:grid-cols-2' : 'xl:grid-cols-4')}>
-                {cardsLoading ? Array.from({ length: canFinance ? 5 : 4 }, (_, i) => <Skeleton key={i} className={cn('h-28 rounded-card', canFinance && i === 4 && 'col-span-full')} />) : (
+              {/* Five equal cards in one row from 1280px; three-over-two on tablets, two columns (and a full-width last card) on phones.
+                  Without financial access there is no Pending amount card, and the other four share the row. */}
+              <div className={cn('grid grid-cols-2 gap-3', canFinance ? 'md:grid-cols-6 xl:grid-cols-5' : 'md:grid-cols-4')}>
+                {cardsLoading ? Array.from({ length: kpiCount }, (_, i) => <Skeleton key={i} className={cn('h-28 rounded-card', slot(i))} />) : (
                   <>
-                    <MetricCard tone="dark" label="Upcoming events" value={derived.upcoming} hint={`${derived.upcomingNext7} in the next 7 days`} to="/events?stage=upcoming" />
+                    <MetricCard tone="dark" className={slot(0)} label="Upcoming events" value={derived.upcoming} hint={`${derived.upcomingNext7} in the next 7 days`} to="/events?stage=upcoming" />
                     <MetricCard
+                      className={slot(1)}
                       label="Today's events"
                       value={schedule.isError ? '—' : today.events}
-                      hint={schedule.isError ? 'Could not load today' : today.events === 0 ? 'No shoots scheduled today' : `${pluralize(today.sessions, 'session')} scheduled today`}
+                      hint={schedule.isError ? 'Could not load today' : `${pluralize(today.sessions, 'session')} scheduled today`}
                       to={`/events?from=${todayKey(tz, clock)}&to=${todayKey(tz, clock)}`}
                     />
-                    <MetricCard label="Ready for delivery" value={derived.readyForDelivery} hint="Out for delivery to clients" to="/events?stage=out_for_delivery" />
-                    {isStaff ? (
-                      <MetricCard
-                        label="Needs attention"
-                        value={attentionEvents}
-                        hint={attentionEvents === 0 ? 'All clear' : 'Events with open issues'}
-                        onClick={scrollToAttention}
-                      />
-                    ) : (
-                      <MetricCard label="Assigned this week" value={sessionsThisWeek} hint="Sessions in the next 7 days" to="/calendar?view=list" />
-                    )}
+                    <MetricCard className={slot(2)} label="Editing in progress" value={derived.editing} hint="Events currently being edited" to="/events?stage=editing" />
+                    <MetricCard className={slot(3)} label="Ready for delivery" value={derived.readyForDelivery} hint="Ready to deliver to clients" to="/events?stage=out_for_delivery" />
                     {/* money is only ever loaded for people with financial access, so everyone else simply has four cards */}
-                    {canFinance && (financials.isLoading ? <Skeleton className="col-span-full h-28 rounded-card" /> : (
+                    {canFinance && (financials.isLoading ? <Skeleton className={cn('h-28 rounded-card', slot(4))} /> : (
                       <MetricCard
                         tone="accent"
-                        className="col-span-full"
-                        icon={<Wallet />}
+                        className={slot(4)}
                         label="Pending amount"
                         value={financials.isError ? '—' : formatMoney(pending.total, currency)}
                         hint={financials.isError ? 'Could not load payments' : pending.count === 0 ? 'All payments settled' : `Outstanding across ${pluralize(pending.count, 'event')}`}
