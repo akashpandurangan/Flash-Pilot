@@ -13,11 +13,11 @@ const buttonStyles = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-brand text-white hover:bg-brand-hover active:bg-black',
-        accent: 'bg-accent text-ink hover:bg-accent-hover active:bg-accent-hover',
+        primary: 'bg-brand text-on-brand hover:bg-brand-hover active:bg-brand-hover',
+        accent: 'bg-accent text-on-accent hover:bg-accent-hover active:bg-accent-hover',
         secondary: 'border border-line-strong bg-surface text-ink hover:bg-sidebar active:bg-subtle',
         ghost: 'text-ink hover:bg-subtle active:bg-line',
-        danger: 'bg-danger text-white hover:bg-[#a3301c] active:bg-[#8f2917]',
+        danger: 'bg-danger-solid text-white hover:bg-[#a3301c] active:bg-[#8f2917]',
         'danger-outline': 'border border-danger/40 bg-surface text-danger hover:bg-danger-soft',
         link: 'h-auto rounded-none px-0 text-ink underline underline-offset-4 hover:no-underline',
       },

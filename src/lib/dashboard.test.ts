@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionItem } from './alerts'
 import {
-  attentionHeadline, buildInsights, computeEventKpis, defaultPipelineStage, effectiveStage, eventProgress, isUpcoming, pickFeaturedEvent,
-  pipelineCounts, pipelineSegments, segmentWeight, todaysEvents, upcomingEvents, type EventLite,
+  attentionHeadline, buildInsights, computeEventKpis, defaultPipelineStage, effectiveStage, eventProgress, isUpcoming,
+  pipelineBarWidth, pipelineCounts, pipelineSegments, todaysEvents, type EventLite,
 } from './dashboard'
+import { chipCounts } from './event-filters'
 
 const NOW = new Date('2030-06-01T08:00:00Z')
 const at = (days: number) => new Date(NOW.getTime() + days * 86_400_000).toISOString()
@@ -65,13 +66,11 @@ describe('upcoming events - one definition for every widget', () => {
     expect(events.filter((e) => isUpcoming(e, NOW)).map((e) => e.id).sort()).toEqual(['inquiry', 'later', 'soon'])
   })
 
-  it('shows the same count in the KPI, the pipeline and the featured card', () => {
+  it('shows the same count in the KPI, the pipeline and the Events panel', () => {
     const k = computeEventKpis(events, [], NOW)
-    const counts = pipelineCounts(events, NOW)
     expect(k.upcoming).toBe(3)
-    expect(counts.upcoming).toBe(k.upcoming)
-    expect(upcomingEvents(events, NOW)).toHaveLength(k.upcoming)
-    expect(pickFeaturedEvent(events, NOW)?.id).toBe('soon')
+    expect(pipelineCounts(events, NOW).upcoming).toBe(k.upcoming)
+    expect(chipCounts(events, NOW).upcoming).toBe(k.upcoming)
   })
 
   it('counts the whole future, and reports the next 7 days separately', () => {
@@ -80,7 +79,7 @@ describe('upcoming events - one definition for every widget', () => {
     expect(k.upcomingNext7).toBe(2) // soon + inquiry
   })
 
-  it('never contradicts itself: featured exists exactly when the count is above zero', () => {
+  it('never contradicts itself: every stage count is the same in the KPIs, the pipeline and the Events panel tabs', () => {
     const sets: EventLite[][] = [
       [],
       [ev('only', { start: 3 })],
@@ -89,9 +88,13 @@ describe('upcoming events - one definition for every widget', () => {
       events,
     ]
     for (const set of sets) {
-      const n = computeEventKpis(set, [], NOW).upcoming
-      expect(pipelineCounts(set, NOW).upcoming, 'pipeline').toBe(n)
-      expect(pickFeaturedEvent(set, NOW) !== null, 'featured').toBe(n > 0)
+      const k = computeEventKpis(set, [], NOW)
+      const pipeline = pipelineCounts(set, NOW)
+      const chips = chipCounts(set, NOW)
+      expect(pipeline.upcoming, 'pipeline upcoming').toBe(k.upcoming)
+      expect(pipeline.editing, 'pipeline editing').toBe(k.editing)
+      expect(pipeline.out_for_delivery, 'pipeline out for delivery').toBe(k.readyForDelivery)
+      for (const stage of Object.keys(pipeline) as (keyof typeof pipeline)[]) expect(chips[stage], `tab ${stage}`).toBe(pipeline[stage])
     }
   })
 
@@ -99,19 +102,11 @@ describe('upcoming events - one definition for every widget', () => {
     const stale = [ev('stale', { start: -5 })]
     expect(computeEventKpis(stale, [], NOW).upcoming).toBe(0)
     expect(pipelineCounts(stale, NOW)).toMatchObject({ upcoming: 0, awaiting_approval: 1 })
-    expect(pickFeaturedEvent(stale, NOW)).toBeNull()
+    expect(chipCounts(stale, NOW)).toMatchObject({ upcoming: 0, awaiting_approval: 1, all: 1 })
   })
 
-  it('features the nearest event, with confirmed bookings winning ties', () => {
-    expect(pickFeaturedEvent([ev('far', { start: 30 }), ev('soon', { start: 2 }), ev('mid', { start: 9 })], NOW)?.id).toBe('soon')
-    expect(pickFeaturedEvent([ev('inq', { booking_status: 'inquiry', start: 4 }), ev('conf', { start: 4 })], NOW)?.id).toBe('conf')
-    expect(pickFeaturedEvent([], NOW)).toBeNull()
-  })
-
-  it('puts an event whose date slipped into the past (stepped back by hand) after genuinely future ones', () => {
-    const slipped = ev('slipped', { start: -3, production_start_applied_at: at(-2) })
-    expect(isUpcoming(slipped, NOW)).toBe(true)
-    expect(pickFeaturedEvent([slipped, ev('real', { start: 6 })], NOW)?.id).toBe('real')
+  it('still treats an event whose date slipped into the past (stepped back by hand) as upcoming', () => {
+    expect(isUpcoming(ev('slipped', { start: -3, production_start_applied_at: at(-2) }), NOW)).toBe(true)
   })
 })
 
@@ -124,7 +119,7 @@ describe('dashboard numbers', () => {
       ev('d', { production_stage: 'delivered', start: -20 }),
       ev('e', { production_stage: 'editing', start: -20 }),
     ]
-    const k = computeEventKpis(events, [item('unstaffed', 'a'), item('unpaid', 'a'), item('overdue_editing', 'e')], NOW)
+    const k = computeEventKpis(events, [item('unstaffed', 'a'), item('delivery_payment', 'a'), item('overdue_editing', 'e')], NOW)
     expect(k.readyForDelivery).toBe(2)
     expect(k.needsAttention).toBe(2)
   })
@@ -188,8 +183,7 @@ describe('pipeline', () => {
   const segments = pipelineSegments({ upcoming: 32, production: 47, awaiting_approval: 6, editing: 18, out_for_delivery: 19, delivered: 12 })
 
   it('lists the six stages in lifecycle order with shares that add up', () => {
-    expect(segments.map((s) => s.fullLabel)).toEqual(['Upcoming', 'Production', 'Waiting for Client Approval', 'Editing', 'Out for Delivery', 'Delivered'])
-    expect(segments.map((s) => s.label)).toContain('Client approval') // the compact name used in the bar
+    expect(segments.map((s) => s.label)).toEqual(['Upcoming', 'Production', 'Waiting for Client Approval', 'Editing', 'Out for Delivery', 'Delivered'])
     expect(segments.reduce((sum, s) => sum + s.share, 0)).toBeCloseTo(1)
     expect(segments[1]!.share).toBeCloseTo(47 / 134)
   })
@@ -200,11 +194,13 @@ describe('pipeline', () => {
     expect(defaultPipelineStage(pipelineSegments({}))).toBeNull()
   })
 
-  it('keeps empty and tiny stages visible', () => {
+  it('fills each bar with its share of the pipeline: empty stages stay empty and tiny ones stay visible', () => {
     const s = pipelineSegments({ upcoming: 50, production: 0, editing: 1 })
-    expect(segmentWeight(s[1]!, s)).toBeGreaterThan(0)
-    expect(segmentWeight(s[0]!, s)).toBeGreaterThan(segmentWeight(s[3]!, s))
-    expect(segmentWeight(pipelineSegments({})[0]!, pipelineSegments({}))).toBe(1)
+    expect(pipelineBarWidth(s[0]!)).toBeCloseTo((50 / 51) * 100)
+    expect(pipelineBarWidth(s[1]!)).toBe(0)
+    expect(pipelineBarWidth(s[3]!)).toBe(4) // 1 of 51 would be about 2%: a sliver is still shown
+    expect(pipelineSegments({}).map(pipelineBarWidth)).toEqual([0, 0, 0, 0, 0, 0])
+    expect(pipelineBarWidth(pipelineSegments({ production: 1 })[1]!)).toBe(100)
   })
 })
 
@@ -224,7 +220,7 @@ describe('studio insights', () => {
   it('turns open issues into plain sentences with correct plurals', () => {
     const items = [
       item('unstaffed', 'a'), item('unstaffed', 'b'), item('unstaffed', 'c'),
-      item('overdue_delivery', 'd'), item('unpaid', 'e', { severity: 'high' }), item('unpaid', 'f', { severity: 'low' }),
+      item('overdue_delivery', 'd'), item('delivery_payment', 'e', { severity: 'high', amount: 15000 }), item('delivery_payment', 'f', { severity: 'high', amount: 5000 }),
       item('team_conflict', 'a'),
     ]
     const events = [
@@ -234,7 +230,7 @@ describe('studio insights', () => {
     const texts = buildInsights(items, events, NOW).map((i) => i.text)
     expect(texts).toContain('3 upcoming events need team confirmation')
     expect(texts).toContain('1 delivery is overdue')
-    expect(texts).toContain('1 payment is overdue')
+    expect(texts).toContain('2 deliveries have payment pending (₹20,000 outstanding)')
     expect(texts).toContain('2 events have pending editing')
     expect(texts).toContain('1 event is waiting for client approval')
     expect(texts).toContain('1 scheduling conflict needs review')
@@ -254,6 +250,6 @@ describe('studio insights', () => {
   it('summarises how many events are flagged', () => {
     expect(attentionHeadline([])).toBe('Everything is on track')
     expect(attentionHeadline([item('unstaffed', 'a')])).toBe('1 event needs attention')
-    expect(attentionHeadline([item('unstaffed', 'a'), item('unpaid', 'a'), item('unpaid', 'b')])).toBe('2 events need attention')
+    expect(attentionHeadline([item('unstaffed', 'a'), item('delivery_payment', 'a'), item('delivery_payment', 'b')])).toBe('2 events need attention')
   })
 })

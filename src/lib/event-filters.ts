@@ -1,5 +1,6 @@
 import { PRODUCTION_STAGES } from './constants'
-import type { BookingStatus, ProductionStage } from '@/types/entities'
+import { effectiveStage, isLive, type LifecycleSubject } from './lifecycle'
+import type { BookingStatus, ProductionStage, ProjectOverview } from '@/types/entities'
 
 /**
  * The status chips on the Events page. They are a friendlier face on the two existing URL filters
@@ -37,4 +38,47 @@ export function activeFilterCount(f: { type: string; emp: string; from: string; 
   const chip = chipFromParams(f)
   const extraBooking = !!f.booking && !(chip === 'cancelled')
   return [f.type, f.emp, f.from, f.to, f.archived === '1' ? '1' : '', extraBooking ? f.booking : ''].filter(Boolean).length
+}
+
+/**
+ * Which events belong under a status chip - the one rule behind the dashboard's Events panel tabs, their counts and
+ * the pipeline, so they always agree. Stage chips use the lifecycle stage the event is really in (see lifecycle.ts) and
+ * leave out cancelled events; "Cancelled" is a booking status, not a stage; "All Events" is everything not archived.
+ */
+export function matchesChip(e: LifecycleSubject, chip: EventChip, now: Date = new Date()): boolean {
+  if (e.archived_at) return false
+  if (chip === 'all') return true
+  if (chip === 'cancelled') return e.booking_status === 'cancelled'
+  return isLive(e) && effectiveStage(e, now) === chip
+}
+
+export function chipCounts(events: LifecycleSubject[], now: Date = new Date()): Record<EventChip, number> {
+  const counts = Object.fromEntries(EVENT_CHIPS.map((c) => [c.value, 0])) as Record<EventChip, number>
+  for (const e of events) for (const { value } of EVENT_CHIPS) if (matchesChip(e, value, now)) counts[value] += 1
+  return counts
+}
+
+type Sortable = Pick<ProjectOverview, 'next_event_at' | 'first_event_at' | 'last_event_at'>
+const at = (iso: string | null | undefined) => (iso ? new Date(iso).getTime() : null)
+
+/** The Events page's default order: the next session first, events with nothing ahead last (most recently finished first). */
+export function sortSoonest<T extends Sortable>(events: T[]): T[] {
+  return [...events].sort((a, b) => {
+    const an = at(a.next_event_at)
+    const bn = at(b.next_event_at)
+    if (an !== null && bn !== null) return an - bn
+    if (an !== null) return -1
+    if (bn !== null) return 1
+    return (at(b.last_event_at) ?? 0) - (at(a.last_event_at) ?? 0)
+  })
+}
+
+/** The Events page link that shows the same set as a chip (same URL parameters the page already understands). */
+export function eventsLink(chip: EventChip): string {
+  const { booking, stage } = paramsFromChip(chip)
+  const q = new URLSearchParams()
+  if (booking) q.set('booking', booking)
+  if (stage) q.set('stage', stage)
+  const qs = q.toString()
+  return qs ? `/events?${qs}` : '/events'
 }

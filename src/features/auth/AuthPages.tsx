@@ -13,7 +13,7 @@ import { useAuth } from './AuthProvider'
 function AuthLayout({ title, subtitle, children, footer }: { title: string; subtitle?: string; children: ReactNode; footer?: ReactNode }) {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1fr_minmax(420px,520px)]">
-      <aside className="relative hidden flex-col justify-between bg-ink p-12 text-white lg:flex">
+      <aside className="relative hidden flex-col justify-between bg-dark p-12 text-white lg:flex">
         <div className="flex items-center gap-2.5 text-lg font-semibold"><Aperture className="size-6" aria-hidden /> Flash Pilot</div>
         <div className="max-w-md">
           <p className="text-3xl font-semibold leading-tight tracking-tight">Every shoot, from first inquiry to final delivery.</p>

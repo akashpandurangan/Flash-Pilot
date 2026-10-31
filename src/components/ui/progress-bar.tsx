@@ -17,7 +17,7 @@ export function ProgressBar({ value, label, tone = 'dark', className }: {
       aria-valuenow={v}
       className={cn('h-2 w-full overflow-hidden rounded-full bg-subtle', className)}
     >
-      <div className={cn('h-full rounded-full transition-[width] duration-500', tone === 'dark' ? 'bg-ink' : 'bg-accent')} style={{ width: `${v}%` }} />
+      <div className={cn('h-full rounded-full transition-[width] duration-500', tone === 'dark' ? 'bg-brand' : 'bg-accent')} style={{ width: `${v}%` }} />
     </div>
   )
 }

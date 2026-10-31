@@ -2,9 +2,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
-import { Toaster } from 'sonner'
 import App from './App'
 import { TooltipProvider } from '@/components/ui/menu'
+import { AppearanceProvider, ThemedToaster } from '@/features/appearance/AppearanceProvider'
 import { AuthProvider } from '@/features/auth/AuthProvider'
 import './index.css'
 
@@ -30,9 +30,11 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <TooltipProvider delayDuration={250}>
           <AuthProvider>
-            <App />
+            <AppearanceProvider>
+              <App />
+              <ThemedToaster />
+            </AppearanceProvider>
           </AuthProvider>
-          <Toaster position="top-center" closeButton toastOptions={{ classNames: { toast: '!border-line !text-ink !shadow-pop' } }} />
         </TooltipProvider>
       </BrowserRouter>
     </QueryClientProvider>

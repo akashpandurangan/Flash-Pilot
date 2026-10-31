@@ -1,19 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
 import { formatDistanceToNowStrict } from 'date-fns'
-import { Camera, CalendarCheck, Clapperboard, Contact, Plus, TriangleAlert, UsersRound } from 'lucide-react'
+import { Camera, CalendarCheck, Clapperboard, Contact, TriangleAlert, UsersRound } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { getDashboardKpis } from '@/api/dashboard'
 import { listFinancials } from '@/api/payments'
-import { getProject, listActiveProjects, listRecentActivity, listTasks } from '@/api/projects'
+import { listActiveProjects, listRecentActivity } from '@/api/projects'
 import { listInventory, listScheduleEvents } from '@/api/schedule'
 import { HeaderContent } from '@/components/layout/header-slot'
-import { Button } from '@/components/ui/button'
 import { ActivityFeed } from '@/components/ui/activity-feed'
 import { Card, EmptyState, ErrorState, Panel, Skeleton } from '@/components/ui/display'
 import { MetricCard } from '@/components/ui/metric-card'
 import { buildActionItems, countAttentionEvents } from '@/lib/alerts'
-import { attentionHeadline, buildInsights, computeEventKpis, pickFeaturedEvent, pipelineCounts, todaysEvents } from '@/lib/dashboard'
+import { attentionHeadline, buildInsights, computeEventKpis, pipelineCounts, todaysEvents } from '@/lib/dashboard'
 import { formatMoney } from '@/lib/money'
 import { pendingAmount } from '@/lib/pending'
 import { toConflictEvent } from '@/lib/schedule'
@@ -22,8 +21,8 @@ import { cn, pluralize } from '@/lib/utils'
 import { useStudio } from '@/features/studio/StudioProvider'
 import { useNow } from '@/hooks/hooks'
 import { AttentionTable } from './AttentionTable'
+import { DashboardEvents } from './DashboardEvents'
 import { EventPipeline } from './EventPipeline'
-import { FeaturedEventCard } from './FeaturedEventCard'
 import { InsightCard } from './InsightCard'
 
 const scrollToAttention = () => {
@@ -52,11 +51,8 @@ export default function DashboardPage() {
   const activity = useQuery({ queryKey: ['activity', studio.id], queryFn: () => listRecentActivity(studio.id, 8) })
 
   const events = useMemo(() => projects.data ?? [], [projects.data])
-  // One clock for every number below, so the KPIs, the featured card and the pipeline can never disagree about "now".
+  // One clock for every number below, so the KPIs, the Events panel and the pipeline can never disagree about "now".
   const clock = useMemo(() => new Date(now), [now])
-  const featured = useMemo(() => pickFeaturedEvent(events, clock), [events, clock])
-  const featuredDetail = useQuery({ queryKey: ['project', featured?.id], queryFn: () => getProject(featured!.id), enabled: !!featured })
-  const featuredTasks = useQuery({ queryKey: ['project-tasks', featured?.id], queryFn: () => listTasks(featured!.id), enabled: !!featured })
 
   const items = useMemo(() => {
     if (!isStaff || !schedule.data || !projects.data) return []
@@ -71,7 +67,8 @@ export default function DashboardPage() {
   // the same rule and the same rows as the Payments page, so the two totals always match
   const pending = useMemo(() => pendingAmount(events, financials.data ?? []), [events, financials.data])
   const stages = useMemo(() => pipelineCounts(events, clock), [events, clock])
-  const insights = useMemo(() => buildInsights(items, events, clock), [items, events, clock])
+  const cancelledCount = useMemo(() => events.filter((e) => e.booking_status === 'cancelled' && !e.archived_at).length, [events])
+  const insights = useMemo(() => buildInsights(items, events, clock, currency), [items, events, clock, currency])
   const attentionEvents = countAttentionEvents(items)
 
   const loading = kpis.isLoading || projects.isLoading
@@ -92,7 +89,7 @@ export default function DashboardPage() {
     <button
       type="button"
       onClick={scrollToAttention}
-      className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-hover"
+      className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-semibold text-on-accent transition-colors hover:bg-accent-hover"
     >
       <TriangleAlert className="size-3.5" aria-hidden />
       {attentionEvents} {attentionEvents === 1 ? 'event needs' : 'events need'} attention
@@ -160,29 +157,20 @@ export default function DashboardPage() {
             </Card>
           </section>
 
-          <div className="dash-featured">
-            {loading ? <Skeleton className="h-[22rem] rounded-panel" /> : featured ? (
-              <FeaturedEventCard event={featured} detail={featuredDetail.data} tasks={featuredTasks.data ?? null} detailLoading={featuredDetail.isLoading} tz={tz} />
-            ) : (
-              <EmptyState
-                className="h-full min-h-40 rounded-panel"
-                icon={<CalendarCheck />}
-                title="No upcoming events"
-                description={isStaff ? 'Create an event and the next one will be featured here.' : 'When you are assigned to an event, the next one is featured here.'}
-                action={isStaff ? <Button asChild size="sm"><Link to="/events/new"><Plus className="size-3.5" /> Create event</Link></Button> : undefined}
-              />
-            )}
+          {/* Events (about 65%) and the pipeline (about 35%) share one row on large screens and stack below that */}
+          <div className="dash-events">
+            {loading ? <Skeleton className="h-[26rem] rounded-panel" /> : <DashboardEvents events={events} now={clock} canManage={isStaff} />}
           </div>
 
           <div className="dash-pipeline">
-            {loading ? <Skeleton className="h-36 rounded-panel" /> : <EventPipeline counts={stages} />}
+            {loading ? <Skeleton className="h-[26rem] rounded-panel" /> : <EventPipeline counts={stages} cancelled={cancelledCount} />}
           </div>
 
           {isStaff && (
             <>
               <div className="dash-attention">
                 {schedule.isLoading || projects.isLoading ? <Skeleton className="h-72 rounded-panel" /> : schedule.isError ? <ErrorState error={schedule.error} onRetry={() => void schedule.refetch()} /> : (
-                  <AttentionTable items={items} tz={tz} eventCount={attentionEvents} updatedLabel={updatedLabel} />
+                  <AttentionTable items={items} tz={tz} currency={currency} eventCount={attentionEvents} updatedLabel={updatedLabel} />
                 )}
               </div>
               <div className="dash-insights">

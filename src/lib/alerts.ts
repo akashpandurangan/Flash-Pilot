@@ -1,10 +1,12 @@
 import { describeConflict, findEmployeeConflicts, findEquipmentConflicts, findUnstaffedEvents, isActiveEvent, type Conflict, type ConflictEvent } from './conflicts'
 import { formatMoney } from './money'
+import type { LifecycleSubject } from './lifecycle'
+import { deliveryPaymentDue } from './pending'
 import { fmtDate, fmtDateOnly, todayKey } from './time'
 import type { Equipment, ProjectFinancials, ProjectOverview } from '@/types/entities'
 
 export type ActionKind =
-  | 'unstaffed' | 'unpaid' | 'overdue_editing' | 'overdue_delivery' | 'missing_details' | 'equipment_conflict' | 'team_conflict' | 'no_equipment'
+  | 'unstaffed' | 'delivery_payment' | 'overdue_editing' | 'overdue_delivery' | 'missing_details' | 'equipment_conflict' | 'team_conflict' | 'no_equipment'
 export type Severity = 'high' | 'medium' | 'low'
 
 export interface ActionItem {
@@ -25,16 +27,19 @@ export interface ActionItem {
   issue: string
   /** Label of the button that opens the fix, e.g. "Assign team". */
   actionLabel: string
+  /** Money involved (delivery_payment: the amount still owed). */
+  amount?: number
 }
 
 type ProjectLike = Pick<ProjectOverview, 'id' | 'name' | 'project_code' | 'booking_status' | 'production_stage' | 'archived_at' | 'editing_due_date' | 'delivery_due_date' | 'editing_completed_at'>
-  & Partial<Pick<ProjectOverview, 'client_name' | 'next_event_at' | 'first_event_at'>>
+  & Partial<Pick<ProjectOverview, 'client_name' | 'next_event_at' | 'first_event_at'>> & LifecycleSubjectExtras
+type LifecycleSubjectExtras = Partial<Omit<LifecycleSubject, 'booking_status' | 'production_stage' | 'archived_at'>>
 
 export interface ActionInput {
   events: ConflictEvent[]
   projects: ProjectLike[]
-  /** null when the viewer has no financial access - unpaid items are then omitted. */
-  financials: Pick<ProjectFinancials, 'project_id' | 'balance' | 'payment_due_date'>[] | null
+  /** null when the viewer has no financial access - payment items are then omitted. */
+  financials: Pick<ProjectFinancials, 'project_id' | 'agreed_amount' | 'paid_amount'>[] | null
   inventory: Pick<Equipment, 'id' | 'name' | 'quantity_owned' | 'is_active' | 'condition'>[]
   tz: string
   currency: string
@@ -47,7 +52,7 @@ export const SEVERITY_LABELS: Record<Severity, string> = { high: 'High', medium:
 /** Issue + button wording per kind, kept in one place so the table, insights and tests agree. */
 const KIND_COPY: Record<ActionKind, { issue: string; action: string }> = {
   unstaffed: { issue: 'Team not assigned', action: 'Assign team' },
-  unpaid: { issue: 'Balance payment pending', action: 'Record payment' },
+  delivery_payment: { issue: 'Payment pending', action: 'Record payment' },
   overdue_editing: { issue: 'Editing overdue', action: 'Update editing' },
   overdue_delivery: { issue: 'Delivery overdue', action: 'Deliver' },
   missing_details: { issue: 'Venue details missing', action: 'Add details' },
@@ -67,13 +72,14 @@ export function buildActionItems(input: ActionInput): ActionItem[] {
 
   const add = (
     kind: ActionKind, severity: Severity, projectId: string, fallbackName: string, title: string, detail: string, fallbackDate: string | null = null,
+    extra: Partial<Pick<ActionItem, 'issue' | 'href' | 'amount'>> = {},
   ) => {
     const p = byProject.get(projectId)
     items.push({
-      id: `${kind}:${projectId}:${items.length}`, kind, severity, title, detail, href: `/events/${projectId}`,
+      id: `${kind}:${projectId}:${items.length}`, kind, severity, title, detail, href: extra.href ?? `/events/${projectId}`,
       projectId, projectName: p?.name ?? fallbackName, clientName: p?.client_name ?? null,
       date: p?.next_event_at ?? p?.first_event_at ?? fallbackDate,
-      issue: KIND_COPY[kind].issue, actionLabel: KIND_COPY[kind].action,
+      issue: extra.issue ?? KIND_COPY[kind].issue, actionLabel: KIND_COPY[kind].action, amount: extra.amount,
     })
   }
 
@@ -84,14 +90,17 @@ export function buildActionItems(input: ActionInput): ActionItem[] {
       `${c.event.title} · ${fmtDate(c.event.startsAt, input.tz)}`, c.event.startsAt)
   }
 
+  // Payment attention is deliberately narrow: only an event that is OUT FOR DELIVERY and still owes money. A partial payment on
+  // an event at any other stage is normal, and the overall figure has its own Pending amount card. Same rule (and same money
+  // helper) as the badge on the event card.
   if (input.financials) {
     const finance = new Map(input.financials.map((f) => [f.project_id, f]))
-    for (const p of confirmedProjects) {
-      const f = finance.get(p.id)
-      if (!f || f.balance <= 0) continue
-      const overdue = f.payment_due_date !== null && f.payment_due_date < today
-      add('unpaid', overdue ? 'high' : 'low', p.id, p.name, `${formatMoney(f.balance, input.currency)} outstanding · ${p.name}`,
-        overdue ? `Payment was due ${fmtDateOnly(f.payment_due_date)}` : 'Partially paid or unpaid')
+    for (const p of input.projects) {
+      const due = deliveryPaymentDue(p, finance.get(p.id), now)
+      if (due === null) continue
+      const owed = formatMoney(due, input.currency)
+      add('delivery_payment', 'high', p.id, p.name, `Payment pending — ${owed} outstanding · ${p.name}`, 'Out for delivery with a balance still to collect', null,
+        { issue: `Payment pending — ${owed} outstanding`, href: `/events/${p.id}?tab=payments`, amount: due })
     }
   }
 

@@ -1,6 +1,8 @@
 import type { ActionItem } from './alerts'
 import { countAttentionEvents } from './alerts'
-import { PRODUCTION_STAGES, PRODUCTION_STAGE_LABELS, PRODUCTION_STAGE_SHORT_LABELS } from './constants'
+import { PRODUCTION_STAGES, PRODUCTION_STAGE_LABELS } from './constants'
+import { formatMoney } from './money'
+import { effectiveStage, isLive, isUpcoming } from './lifecycle'
 import { todayKey, zonedDayKey } from './time'
 import type { BookingStatus, ProductionStage, ProjectOverview } from '@/types/entities'
 
@@ -17,49 +19,9 @@ export type EventLite = Pick<
 >
 
 const DAY = 86_400_000
-/** Counts toward the dashboard: in this studio's list, not archived, not cancelled. */
-export const isLive = (e: Pick<EventLite, 'archived_at' | 'booking_status'>) => !e.archived_at && e.booking_status !== 'cancelled'
 
-/**
- * The stage an event is really in right now. The server job (advance_event_lifecycle) moves confirmed
- * events on at their scheduled start and end; this applies the same two rules to the row we have, so a
- * late tick - or the job not being scheduled yet - never leaves an event in the wrong bucket. It respects
- * the job's own "already applied" markers, so a manual step back is honoured here exactly as on the server.
- * Inquiries and cancelled events never advance.
- */
-export function effectiveStage(e: EventLite, now: Date = new Date()): ProductionStage {
-  if (e.booking_status !== 'confirmed' || e.archived_at) return e.production_stage
-  const t = now.getTime()
-  let stage = e.production_stage
-  if (stage === 'upcoming' && !e.production_start_applied_at && e.first_event_at && new Date(e.first_event_at).getTime() <= t) stage = 'production'
-  if (stage === 'production' && !e.production_end_applied_at && e.last_event_at && new Date(e.last_event_at).getTime() <= t) stage = 'awaiting_approval'
-  return stage
-}
-
-/**
- * THE definition of an upcoming event, used by the KPI, the featured card and the pipeline alike:
- * in this studio, not cancelled or archived, and production has not started (so it has not finished either).
- */
-export const isUpcoming = (e: EventLite, now: Date = new Date()) => isLive(e) && effectiveStage(e, now) === 'upcoming'
-
-/** Upcoming events, nearest first. Anything whose date has already slipped past (stepped back by hand) goes last. */
-export function upcomingEvents(events: EventLite[], now: Date = new Date()): EventLite[] {
-  const t = now.getTime()
-  const start = (e: EventLite) => (e.first_event_at ? new Date(e.first_event_at).getTime() : Number.MAX_SAFE_INTEGER)
-  return events
-    .filter((e) => isUpcoming(e, now))
-    .sort((a, b) => {
-      const aLate = start(a) < t
-      const bLate = start(b) < t
-      if (aLate !== bLate) return aLate ? 1 : -1
-      return start(a) - start(b) || Number(b.booking_status === 'confirmed') - Number(a.booking_status === 'confirmed')
-    })
-}
-
-/** The event to feature: the nearest upcoming one (confirmed bookings win ties). Null only when there is genuinely none. */
-export function pickFeaturedEvent(events: EventLite[], now: Date = new Date()): EventLite | null {
-  return upcomingEvents(events, now)[0] ?? null
-}
+// the rules live in lifecycle.ts so the filters and alerts can use them too
+export { effectiveStage, isLive, isUpcoming }
 
 export interface TodaySession {
   starts_at: string
@@ -106,10 +68,7 @@ export function pipelineCounts(events: EventLite[], now: Date = new Date()): Rec
 
 export interface PipelineSegment {
   stage: ProductionStage
-  /** Short name for the compact bar. */
   label: string
-  /** Full stage name, for tooltips and screen readers. */
-  fullLabel: string
   count: number
   /** 0–1 share of all events in the pipeline. */
   share: number
@@ -119,7 +78,7 @@ export function pipelineSegments(counts: Partial<Record<ProductionStage, number>
   const total = PRODUCTION_STAGES.reduce((sum, s) => sum + Number(counts[s] ?? 0), 0)
   return PRODUCTION_STAGES.map((stage) => {
     const count = Number(counts[stage] ?? 0)
-    return { stage, label: PRODUCTION_STAGE_SHORT_LABELS[stage], fullLabel: PRODUCTION_STAGE_LABELS[stage], count, share: total === 0 ? 0 : count / total }
+    return { stage, label: PRODUCTION_STAGE_LABELS[stage], count, share: total === 0 ? 0 : count / total }
   })
 }
 
@@ -130,15 +89,9 @@ export function defaultPipelineStage(segments: PipelineSegment[]): ProductionSta
   return open.reduce((best, s) => (s.count > best.count ? s : best)).stage
 }
 
-/**
- * Flex weight for a segment so tiny stages stay visible and readable: proportional to the count but
- * never thinner than `floor` of the average segment.
- */
-export function segmentWeight(segment: PipelineSegment, segments: PipelineSegment[], floor = 0.45): number {
-  const total = segments.reduce((s, x) => s + x.count, 0)
-  if (total === 0) return 1
-  const average = total / segments.length
-  return Math.max(segment.count, average * floor)
+/** How full (in %) a stage's bar is: its share of the pipeline, with a visible sliver for any stage that is not empty. */
+export function pipelineBarWidth(segment: PipelineSegment): number {
+  return segment.count === 0 ? 0 : Math.max(segment.share * 100, 4)
 }
 
 export interface EventProgress {
@@ -170,7 +123,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  * Plain-language observations computed from the same data as the table. This is rules over your own
  * records, not machine learning - the UI labels it that way.
  */
-export function buildInsights(items: ActionItem[], events: EventLite[], now: Date = new Date()): Insight[] {
+export function buildInsights(items: ActionItem[], events: EventLite[], now: Date = new Date(), currency = 'INR'): Insight[] {
   const t = now.getTime()
   const distinct = (pred: (i: ActionItem) => boolean) => new Set(items.filter(pred).map((i) => i.projectId)).size
   const out: Insight[] = []
@@ -184,8 +137,12 @@ export function buildInsights(items: ActionItem[], events: EventLite[], now: Dat
   const lateDelivery = distinct((i) => i.kind === 'overdue_delivery')
   if (lateDelivery) out.push({ id: 'delivery-late', tone: 'risk', count: lateDelivery, href: '/events?stage=out_for_delivery', text: `${plural(lateDelivery, 'delivery is', 'deliveries are')} overdue` })
 
-  const latePayments = distinct((i) => i.kind === 'unpaid' && i.severity === 'high')
-  if (latePayments) out.push({ id: 'payments-late', tone: 'risk', count: latePayments, href: '/payments', text: `${plural(latePayments, 'payment is', 'payments are')} overdue` })
+  const paymentItems = items.filter((i) => i.kind === 'delivery_payment')
+  const latePayments = new Set(paymentItems.map((i) => i.projectId)).size
+  if (latePayments) {
+    const owed = formatMoney(paymentItems.reduce((sum, i) => sum + (i.amount ?? 0), 0), currency)
+    out.push({ id: 'payments-late', tone: 'risk', count: latePayments, href: '/events?stage=out_for_delivery', text: `${plural(latePayments, 'delivery has', 'deliveries have')} payment pending (${owed} outstanding)` })
+  }
 
   const live = events.filter((e) => isLive(e) && e.booking_status === 'confirmed')
   const waiting = live.filter((e) => effectiveStage(e, now) === 'awaiting_approval').length

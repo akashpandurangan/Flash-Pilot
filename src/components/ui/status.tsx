@@ -78,15 +78,15 @@ export function StageStepper({ stage, className }: { stage: ProductionStage; cla
             <span
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium',
-                done && 'bg-ink text-white',
-                active && 'bg-accent text-ink',
+                done && 'bg-brand text-on-brand',
+                active && 'bg-accent text-on-accent',
                 !done && !active && 'bg-subtle text-ink-muted',
               )}
             >
               {done && <Check className="size-3" strokeWidth={3} aria-hidden />}
               {PRODUCTION_STAGE_LABELS[s]}
             </span>
-            {i < PRODUCTION_STAGES.length - 1 && <span className={cn('h-px w-3 sm:w-5', i < current ? 'bg-ink' : 'bg-line-strong')} aria-hidden />}
+            {i < PRODUCTION_STAGES.length - 1 && <span className={cn('h-px w-3 sm:w-5', i < current ? 'bg-brand' : 'bg-line-strong')} aria-hidden />}
           </li>
         )
       })}

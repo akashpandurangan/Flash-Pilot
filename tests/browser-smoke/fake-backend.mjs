@@ -21,6 +21,10 @@ export const ids = {
   p2: 'a0000000-0000-4000-8000-000000000002',
   p3: 'a0000000-0000-4000-8000-000000000003',
   p4: 'a0000000-0000-4000-8000-000000000004',
+  p5: 'a0000000-0000-4000-8000-000000000005',
+  p6: 'a0000000-0000-4000-8000-000000000006',
+  p7: 'a0000000-0000-4000-8000-000000000007',
+  p8: 'a0000000-0000-4000-8000-000000000008',
 }
 
 const studioRow = {
@@ -69,6 +73,11 @@ export function buildDb(role = 'owner') {
     proj(ids.p2, 'FP-0002', 'Mehta Corporate Launch', clients[1], 'confirmed', 'upcoming', { event_type: 'corporate', editing_due_date: null, delivery_due_date: null, editor_id: null }),
     proj(ids.p3, 'FP-0003', 'Nair Maternity Shoot', clients[2], 'inquiry', 'upcoming', { event_type: 'maternity', confirmed_at: null, editor_id: null }),
     proj(ids.p4, 'FP-0004', 'Kapoor Engagement Shoot', clients[1], 'confirmed', 'awaiting_approval', { event_type: 'engagement', editor_id: ids.meera, production_started_at: iso(-3 * D), shoot_completed_at: iso(-3 * D + 4 * H), production_start_applied_at: iso(-3 * D), production_end_applied_at: iso(-3 * D + 4 * H) }),
+    proj(ids.p5, 'FP-0005', 'Verma Anniversary Shoot', clients[2], 'cancelled', 'upcoming', { event_type: 'other', confirmed_at: null, cancelled_at: iso(-2 * D), cancel_reason: 'Client postponed', editor_id: null }),
+    proj(ids.p6, 'FP-0006', 'Iyer Birthday Party', clients[1], 'confirmed', 'delivered', { event_type: 'birthday', production_started_at: iso(-31 * D), shoot_completed_at: iso(-31 * D + 4 * H), editing_started_at: iso(-28 * D), editing_completed_at: iso(-20 * D), ready_for_delivery_at: iso(-19 * D), delivered_at: iso(-18 * D), client_approved_at: iso(-28 * D), client_approved_by_name: 'Olivia Mehra', production_start_applied_at: iso(-31 * D), production_end_applied_at: iso(-31 * D + 4 * H), editing_due_date: day(-21), delivery_due_date: day(-18) }),
+    // out for delivery: SN Wedding still owes 15,000 (needs attention); Rao Reception is fully paid (does not)
+    proj(ids.p7, 'FP-0007', 'SN Wedding', clients[1], 'confirmed', 'out_for_delivery', { production_started_at: iso(-12 * D), shoot_completed_at: iso(-12 * D + 6 * H), editing_started_at: iso(-10 * D), editing_completed_at: iso(-3 * D), ready_for_delivery_at: iso(-1 * D), client_approved_at: iso(-10 * D), client_approved_by_name: 'Olivia Mehra', production_start_applied_at: iso(-12 * D), production_end_applied_at: iso(-12 * D + 6 * H), editing_due_date: day(-3), delivery_due_date: day(5) }),
+    proj(ids.p8, 'FP-0008', 'Rao Reception', clients[2], 'confirmed', 'out_for_delivery', { event_type: 'reception', production_started_at: iso(-9 * D), shoot_completed_at: iso(-9 * D + 5 * H), editing_started_at: iso(-8 * D), editing_completed_at: iso(-2 * D), ready_for_delivery_at: iso(-1 * D), client_approved_at: iso(-8 * D), client_approved_by_name: 'Olivia Mehra', production_start_applied_at: iso(-9 * D), production_end_applied_at: iso(-9 * D + 5 * H), editing_due_date: day(-2), delivery_due_date: day(6) }),
   ]
 
   const events = [
@@ -78,6 +87,10 @@ export function buildDb(role = 'owner') {
     { id: 'b0000000-0000-4000-8000-000000000004', studio_id: ids.studio, project_id: ids.p2, title: 'After-party', event_type: 'other', starts_at: iso(1 * D + 4 * H), ends_at: iso(1 * D + 8 * H), venue_name: null, venue_address: null, map_url: null, notes: null, sort_order: 1, cancelled_at: null },
     { id: 'b0000000-0000-4000-8000-000000000005', studio_id: ids.studio, project_id: ids.p3, title: 'Maternity session', event_type: 'maternity', starts_at: iso(9 * D), ends_at: iso(9 * D + 3 * H), venue_name: 'Studio A', venue_address: 'Lumen Studio', map_url: null, notes: null, sort_order: 0, cancelled_at: null },
     { id: 'b0000000-0000-4000-8000-000000000006', studio_id: ids.studio, project_id: ids.p4, title: 'Engagement shoot', event_type: 'engagement', starts_at: iso(-3 * D), ends_at: iso(-3 * D + 4 * H), venue_name: 'Marine Drive', venue_address: 'Mumbai', map_url: null, notes: null, sort_order: 0, cancelled_at: null },
+    { id: 'b0000000-0000-4000-8000-000000000007', studio_id: ids.studio, project_id: ids.p5, title: 'Anniversary session', event_type: 'other', starts_at: iso(15 * D), ends_at: iso(15 * D + 3 * H), venue_name: 'Juhu Beach', venue_address: 'Mumbai', map_url: null, notes: null, sort_order: 0, cancelled_at: null },
+    { id: 'b0000000-0000-4000-8000-000000000008', studio_id: ids.studio, project_id: ids.p6, title: 'Birthday party', event_type: 'birthday', starts_at: iso(-31 * D), ends_at: iso(-31 * D + 4 * H), venue_name: 'Taj Lands End', venue_address: 'Bandra, Mumbai', map_url: null, notes: null, sort_order: 0, cancelled_at: null },
+    { id: 'b0000000-0000-4000-8000-000000000009', studio_id: ids.studio, project_id: ids.p7, title: 'Wedding day', event_type: 'wedding', starts_at: iso(-12 * D), ends_at: iso(-12 * D + 6 * H), venue_name: 'ITC Grand Central', venue_address: 'Parel, Mumbai', map_url: null, notes: null, sort_order: 0, cancelled_at: null },
+    { id: 'b0000000-0000-4000-8000-00000000000a', studio_id: ids.studio, project_id: ids.p8, title: 'Reception', event_type: 'reception', starts_at: iso(-9 * D), ends_at: iso(-9 * D + 5 * H), venue_name: 'Sofitel BKC', venue_address: 'BKC, Mumbai', map_url: null, notes: null, sort_order: 0, cancelled_at: null },
   ].map((e) => {
     const withTeam = {
       'b0000000-0000-4000-8000-000000000001': [asg(e.id, employees[1], 'lead_photographer'), asg(e.id, employees[2], 'videographer')],
@@ -86,6 +99,10 @@ export function buildDb(role = 'owner') {
       'b0000000-0000-4000-8000-000000000004': [asg(e.id, employees[1], 'second_photographer')], // double-booked with Riya on the launch
       'b0000000-0000-4000-8000-000000000005': [],
       'b0000000-0000-4000-8000-000000000006': [asg(e.id, employees[1], 'lead_photographer')],
+      'b0000000-0000-4000-8000-000000000007': [asg(e.id, employees[2], 'videographer')],
+      'b0000000-0000-4000-8000-000000000008': [asg(e.id, employees[1], 'lead_photographer'), asg(e.id, employees[2], 'videographer')],
+      'b0000000-0000-4000-8000-000000000009': [asg(e.id, employees[1], 'lead_photographer')],
+      'b0000000-0000-4000-8000-00000000000a': [asg(e.id, employees[2], 'videographer')],
     }[e.id]
     const withGear = e.id.endsWith('3') || e.id.endsWith('4') ? [gear(e.id, 0)] : e.id.endsWith('2') ? [gear(e.id, 0), gear(e.id, 2, 2)] : []
     return { ...e, event_assignments: withTeam, event_equipment: withGear }
@@ -105,6 +122,10 @@ export function buildDb(role = 'owner') {
     { project_id: ids.p2, studio_id: ids.studio, agreed_amount: 80000, payment_due_date: day(14), paid_amount: 80000, balance: 0 },
     { project_id: ids.p3, studio_id: ids.studio, agreed_amount: 30000, payment_due_date: null, paid_amount: 0, balance: 30000 }, // an inquiry: quoted, not owed yet
     { project_id: ids.p4, studio_id: ids.studio, agreed_amount: 60000, payment_due_date: day(20), paid_amount: 35000, balance: 25000 },
+    { project_id: ids.p5, studio_id: ids.studio, agreed_amount: 20000, payment_due_date: null, paid_amount: 0, balance: 20000 }, // cancelled: not owed
+    { project_id: ids.p6, studio_id: ids.studio, agreed_amount: 45000, payment_due_date: day(-19), paid_amount: 45000, balance: 0 },
+    { project_id: ids.p7, studio_id: ids.studio, agreed_amount: 50000, payment_due_date: day(3), paid_amount: 35000, balance: 15000 },
+    { project_id: ids.p8, studio_id: ids.studio, agreed_amount: 30000, payment_due_date: day(4), paid_amount: 30000, balance: 0 },
   ]
   const payments = [
     { id: 'd0000000-0000-4000-8000-000000000001', studio_id: ids.studio, project_id: ids.p1, amount: 100000, paid_on: day(-20), method: 'upi', reference: 'UTR1234567', notes: null, is_advance: true, status: 'valid', voided_at: null, void_reason: null, recorded_by_name: 'Olivia Mehra', created_at: iso(-20 * D), project: { id: ids.p1, name: 'Sharma–Rao Wedding', project_code: 'FP-0001' } },

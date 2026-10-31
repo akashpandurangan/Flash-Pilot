@@ -18,7 +18,7 @@ import { StudioSelector } from './StudioSelector'
 
 const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   overview: LayoutDashboard, events: CalendarCheck, calendar: CalendarDays, clients: Contact, team: UsersRound, equipment: Camera,
-  payments: IndianRupee, reports: BarChart3,
+  payments: IndianRupee, reports: BarChart3, settings: Settings, account: UserCog,
 }
 
 const SECTIONS: NavSection[] = ['main', 'studio', 'workspace']
@@ -32,7 +32,7 @@ interface Props {
 
 /** The floating white sidebar: brand, studio selector, grouped navigation with live counts, profile. */
 export function AppSidebar({ collapsed = false, onToggleCollapsed, onNavigate }: Props) {
-  const { actor, studio, me, role, can } = useStudio()
+  const { actor, studio, me, role } = useStudio()
   const { signOut } = useAuth()
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
@@ -46,11 +46,9 @@ export function AppSidebar({ collapsed = false, onToggleCollapsed, onNavigate }:
   }
 
   const items = visibleNav(actor)
-  const settingsItem = can('studio.manage') ? { to: '/settings', label: 'Settings', Icon: Settings } : { to: '/account', label: 'Account', Icon: UserCog }
-  const settingsActive = pathname === settingsItem.to || (settingsItem.to === '/settings' && pathname === '/account')
 
   const link = (item: NavItem) => {
-    const Icon = ICONS[item.key] ?? LayoutDashboard
+    const Icon = ICONS[item.icon ?? item.key] ?? LayoutDashboard
     const active = isNavActive(item, pathname, search)
     const count = item.badge ? counts[item.badge] : undefined
     const el = (
@@ -62,14 +60,14 @@ export function AppSidebar({ collapsed = false, onToggleCollapsed, onNavigate }:
         aria-label={collapsed ? `${item.label}${count ? `, ${count}` : ''}` : undefined}
         className={cn(
           'group relative flex h-10 items-center gap-2.5 rounded-full px-3 text-sm font-medium transition-colors [@media(max-height:800px)]:h-[34px]',
-          active ? 'bg-ink text-white' : 'text-ink-muted hover:bg-subtle hover:text-ink',
+          active ? 'bg-brand text-on-brand' : 'text-ink-muted hover:bg-subtle hover:text-ink',
           collapsed && 'justify-center px-0',
         )}
       >
         <Icon className="size-[18px] shrink-0" aria-hidden />
         {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
         {!collapsed && count !== undefined && count > 0 && (
-          <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums', active ? 'bg-white/15 text-white' : 'bg-subtle text-ink-muted group-hover:bg-surface')}>
+          <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums', active ? 'bg-on-brand/15 text-on-brand' : 'bg-subtle text-ink-muted group-hover:bg-surface')}>
             {count > 99 ? '99+' : count}
           </span>
         )}
@@ -79,42 +77,44 @@ export function AppSidebar({ collapsed = false, onToggleCollapsed, onNavigate }:
     return collapsed ? <Tooltip key={item.key} content={item.label} side="right">{el}</Tooltip> : el
   }
 
-  const SettingsIcon = settingsItem.Icon
-  const settingsLink = (
-    <Link
-      to={settingsItem.to}
-      onClick={onNavigate}
-      aria-current={settingsActive ? 'page' : undefined}
-      aria-label={collapsed ? settingsItem.label : undefined}
-      className={cn(
-        'flex h-10 items-center gap-2.5 rounded-full px-3 text-sm font-medium transition-colors [@media(max-height:800px)]:h-[34px]',
-        settingsActive ? 'bg-ink text-white' : 'text-ink-muted hover:bg-subtle hover:text-ink',
-        collapsed && 'justify-center px-0',
-      )}
-    >
-      <SettingsIcon className="size-[18px] shrink-0" aria-hidden />
-      {!collapsed && settingsItem.label}
-    </Link>
-  )
-
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className={cn('flex items-center gap-2.5 px-0.5 pb-3', collapsed && 'flex-col gap-3 px-0')}>
-        <Link to="/" onClick={onNavigate} aria-label="Flash Pilot - overview" className={cn('flex min-w-0 flex-1 items-center gap-2.5', collapsed && 'flex-none')}>
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-dark text-accent"><Aperture className="size-5" aria-hidden /></span>
-          {!collapsed && <span className="truncate text-[19px] font-semibold tracking-tight">Flash Pilot</span>}
-        </Link>
-        {onToggleCollapsed && (
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-subtle text-ink-muted transition-colors hover:bg-line hover:text-ink"
-          >
-            {collapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
-          </button>
-        )}
-      </div>
+      {collapsed && onToggleCollapsed ? (
+        /* Collapsed: just the logo. Pointing at it (or focusing it) swaps in the expand chevron; the button is the
+           same size as the logo, so nothing moves. */
+        <div className="flex justify-center pb-3">
+          <Tooltip content="Expand sidebar" side="right">
+            <button
+              type="button"
+              onClick={onToggleCollapsed}
+              aria-label="Expand sidebar"
+              className="group relative flex size-10 items-center justify-center rounded-xl bg-dark text-accent outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+            >
+              <Aperture className="size-5 transition-opacity duration-150 group-hover:opacity-20 group-focus-visible:opacity-20 [@media(hover:none)]:opacity-25" aria-hidden />
+              <ChevronsRight className="absolute size-[18px] text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100" aria-hidden />
+            </button>
+          </Tooltip>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2.5 px-0.5 pb-3">
+          <Link to="/" onClick={onNavigate} aria-label="Flash Pilot - overview" className="flex min-w-0 flex-1 items-center gap-2.5">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-dark text-accent"><Aperture className="size-5" aria-hidden /></span>
+            <span className="truncate text-[19px] font-semibold tracking-tight">Flash Pilot</span>
+          </Link>
+          {onToggleCollapsed && (
+            <Tooltip content="Collapse sidebar" side="right">
+              <button
+                type="button"
+                onClick={onToggleCollapsed}
+                aria-label="Collapse sidebar"
+                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-subtle text-ink-muted transition-colors hover:bg-line hover:text-ink"
+              >
+                <ChevronsLeft className="size-4" />
+              </button>
+            </Tooltip>
+          )}
+        </div>
+      )}
 
       <StudioSelector collapsed={collapsed} />
 
@@ -135,8 +135,7 @@ export function AppSidebar({ collapsed = false, onToggleCollapsed, onNavigate }:
         })}
       </nav>
 
-      <div className="mt-2 space-y-1.5 border-t border-line pt-2.5 [@media(max-height:800px)]:space-y-1 [@media(max-height:800px)]:pt-2">
-        {collapsed ? <Tooltip content={settingsItem.label} side="right">{settingsLink}</Tooltip> : settingsLink}
+      <div className="mt-2 border-t border-line pt-2.5 [@media(max-height:800px)]:pt-2">
         <div className={cn('flex items-center gap-2 rounded-2xl p-1.5', collapsed ? 'flex-col' : 'bg-subtle')}>
           <Link to="/account" onClick={onNavigate} aria-label={`${me.full_name} - account`} className={cn('flex min-w-0 flex-1 items-center gap-2.5 rounded-xl', collapsed && 'flex-none')}>
             <Avatar name={me.full_name} className="size-9 bg-surface" />

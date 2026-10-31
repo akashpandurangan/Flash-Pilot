@@ -15,6 +15,7 @@ import { errorMessage } from '@/lib/errors'
 import { isValidEmail, isValidPhone } from '@/lib/utils'
 import type { ChecklistTemplateItem, TaskPhase } from '@/types/entities'
 import { useStudio } from '@/features/studio/StudioProvider'
+import { AppearanceSettings } from './AppearanceSettings'
 
 const schema = z.object({
   name: z.string().trim().min(2, 'Enter your studio name').max(120),
@@ -73,6 +74,7 @@ export default function SettingsPage() {
         ))}
       </nav>
       <div className="grid max-w-3xl gap-4">
+        <AppearanceSettings />
         <form
           noValidate
           className="contents"

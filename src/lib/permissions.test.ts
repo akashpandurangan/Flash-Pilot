@@ -44,10 +44,18 @@ describe('permission matrix', () => {
 
   it('hides navigation the role cannot use', () => {
     const labels = (a: Actor) => visibleNav(a).map((n) => n.label)
-    expect(labels(owner)).toEqual(['Overview', 'Events', 'Calendar', 'Clients', 'Team', 'Equipment', 'Payments', 'Reports'])
+    expect(labels(owner)).toEqual(['Overview', 'Events', 'Calendar', 'Clients', 'Team', 'Equipment', 'Payments', 'Reports', 'Settings'])
     expect(labels(managerNoFin)).not.toContain('Payments')
     expect(labels(managerFin)).toContain('Payments')
-    expect(labels(photographer)).toEqual(['Overview', 'Events', 'Calendar'])
+    expect(labels(photographer)).toEqual(['Overview', 'Events', 'Calendar', 'Account'])
+  })
+
+  it('puts Settings directly under Reports in the Workspace group; everyone else gets their Account page there', () => {
+    const workspace = (a: Actor) => visibleNav(a).filter((n) => n.section === 'workspace').map((n) => [n.label, n.to])
+    expect(workspace(owner)).toEqual([['Reports', '/reports'], ['Settings', '/settings']])
+    expect(workspace(managerNoFin)).toEqual([['Reports', '/reports'], ['Account', '/account']])
+    expect(workspace(photographer)).toEqual([['Account', '/account']])
+    expect(visibleNav(owner).map((n) => n.key)).not.toContain('account')
   })
 
   it('limits checklist phases by role', () => {
@@ -64,7 +72,7 @@ describe('sidebar highlighting', () => {
   const active = (path: string, search = '') => NAV_ITEMS.filter((n) => isNavActive(n, path, search)).map((n) => n.key)
 
   it('highlights exactly one entry for every route', () => {
-    for (const [path, search] of [['/', ''], ['/events', ''], ['/events/abc', ''], ['/events/new', ''], ['/calendar', ''], ['/clients/xyz', ''], ['/payments', ''], ['/reports', '']] as const) {
+    for (const [path, search] of [['/', ''], ['/events', ''], ['/events/abc', ''], ['/events/new', ''], ['/calendar', ''], ['/clients/xyz', ''], ['/payments', ''], ['/reports', ''], ['/settings', ''], ['/account', '']] as const) {
       expect(active(path, search), `${path}${search}`).toHaveLength(1)
     }
     expect(active('/')).toEqual(['overview'])

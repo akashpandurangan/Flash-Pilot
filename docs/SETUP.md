@@ -51,6 +51,7 @@ destructive statements.
 | `…06_event_team.sql` | `set_event_team()` for changing a team after creation |
 | `…07_event_terminology.sql` | Re-words what the database writes (notifications, activity log, errors, stored links) to the *Events / Sessions* terms. Function replacements only - no schema change |
 | `…08_workflow_stages.sql` | The new production stages: adds `awaiting_approval` and renames `ready_for_delivery` to `out_for_delivery` (existing rows move with the rename). Enum change only, so it can commit before 09 uses the new values |
+| `…10_profile_appearance.sql` | Adds `profiles.appearance` (jsonb, default `{}`) so each person's theme and accent follow them across devices. Own-row RLS already covers it; additive and optional - the app works from the browser alone until it is applied |
 | `…09_event_lifecycle.sql` | Client-approval columns, `advance_event_lifecycle()` + its **every-minute `pg_cron` job**, the six-stage `project_workflow_action()`, the new `dashboard_kpis()`, and a one-off catch-up of existing events |
 
 **With the CLI (recommended)**

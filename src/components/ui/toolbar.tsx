@@ -64,20 +64,24 @@ export const FilterButton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<H
     >
       <SlidersHorizontal className="size-4" aria-hidden />
       {children}
-      {active > 0 && <span className="flex size-5 items-center justify-center rounded-full bg-accent text-[11px] font-semibold tabular-nums">{active}</span>}
+      {active > 0 && <span className="flex size-5 items-center justify-center rounded-full bg-accent text-[11px] font-semibold tabular-nums text-on-accent">{active}</span>}
     </button>
   )
 })
 
 /** Horizontally scrollable status chips (All / Upcoming / …). The selected chip is lime. */
-export function FilterChips<T extends string>({ value, onChange, options, label }: {
+export function FilterChips<T extends string>({ value, onChange, options, label, compact, className }: {
   value: T
   onChange: (v: T) => void
   options: { value: T; label: string; count?: number }[]
   label: string
+  /** Shorter chips, for use inside a card. */
+  compact?: boolean
+  /** Replaces the default (page-level) edge-to-edge scrolling margins. */
+  className?: string
 }) {
   return (
-    <div role="group" aria-label={label} className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 scrollbar-thin md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
+    <div role="group" aria-label={label} className={cn('flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin md:flex-wrap md:overflow-visible', className ?? '-mx-4 px-4 md:mx-0 md:px-0')}>
       {options.map((o) => {
         const selected = value === o.value
         return (
@@ -87,13 +91,14 @@ export function FilterChips<T extends string>({ value, onChange, options, label 
             aria-pressed={selected}
             onClick={() => onChange(o.value)}
             className={cn(
-              'inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-3.5 text-[13px] font-medium transition-colors',
-              selected ? 'bg-accent text-ink' : 'bg-surface text-ink-muted ring-1 ring-line hover:text-ink hover:ring-line-strong',
+              'inline-flex shrink-0 items-center gap-2 rounded-full font-medium transition-colors',
+              compact ? 'h-8 px-3 text-xs' : 'h-9 px-3.5 text-[13px]',
+              selected ? 'bg-accent text-on-accent' : 'bg-surface text-ink-muted ring-1 ring-line hover:text-ink hover:ring-line-strong',
             )}
           >
             {o.label}
             {o.count !== undefined && (
-              <span className={cn('rounded-full px-1.5 text-xs tabular-nums', selected ? 'bg-ink/10' : 'bg-subtle')}>{o.count}</span>
+              <span className={cn('rounded-full px-1.5 text-xs tabular-nums', selected ? 'bg-on-accent/10' : 'bg-subtle')}>{o.count}</span>
             )}
           </button>
         )

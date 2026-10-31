@@ -30,10 +30,14 @@
   /* primary action = near-black; accent = lime */
   --color-brand: #17171b;
   --color-brand-hover: #2c2c33;
+  --color-on-brand: #ffffff; /* text on brand fills */
+  --color-inverse: #17171b; /* solid dark chips, tooltips: flips to light in the dark theme, never follows the accent */
+  --color-on-inverse: #ffffff;
   --color-accent: #c7f34a;
   --color-accent-hover: #bde63a;
   --color-accent-soft: #eefbc6;
   --color-accent-ink: #34470b; /* readable text on accent-soft */
+  --color-on-accent: #17171b; /* text on accent fills */
 
   /* semantic text/tint pairs (AA on their soft backgrounds) */
   --color-success: #3b6a0a;
@@ -42,6 +46,7 @@
   --color-warning-soft: #fdf0d2;
   --color-danger: #c03a24;
   --color-danger-soft: #fde7e2;
+  --color-danger-solid: #c03a24; /* destructive buttons and badges: a solid red with white text in both themes */
 
   /* vivid fills for charts, dots and risk markers (never used for small text) */
   --color-ok: #b9e96a;
@@ -64,7 +69,47 @@
   --shadow-float: 0 24px 60px -24px rgb(23 23 27 / 0.28);
 }
 
+/*
+  Dark theme. Not an inversion: surfaces step up in lightness from page to card to raised panel, the "dark" feature panels
+  (Upcoming card, insights) become a raised grey so they still stand out, text is off-white with a muted tier, and the
+  status tints are re-tuned for dark backgrounds. The accent is set per user from Settings (see lib/appearance.ts);
+  lime, the default, has its own dark values here.
+*/
 @layer base {
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --color-page: #0e0e11;
+    --color-surface: #17171b;
+    --color-subtle: #212127;
+    --color-sidebar: #1d1d22;
+    --color-dark: #2a2a31;
+    --color-dark-soft: #35353d;
+    --color-ink: #f2f2f5;
+    --color-ink-muted: #a4a4af;
+    --color-ink-faint: #8d8d99;
+    --color-line: #2b2b32;
+    --color-line-strong: #3c3c46;
+    --color-brand: #f2f2f5;
+    --color-brand-hover: #ffffff;
+    --color-on-brand: #17171b;
+    --color-inverse: #f2f2f5;
+    --color-on-inverse: #17171b;
+    --color-accent-hover: #d6f76a;
+    --color-accent-soft: #28340f;
+    --color-accent-ink: #d3f56b;
+    --color-success: #a6dc5a;
+    --color-success-soft: #1f2d0e;
+    --color-warning: #f2b84b;
+    --color-warning-soft: #33270b;
+    --color-danger: #ff8f7a;
+    --color-danger-soft: #3b1913;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5);
+    --shadow-pop: 0 14px 36px -10px rgb(0 0 0 / 0.65), 0 3px 8px -3px rgb(0 0 0 / 0.45);
+    --shadow-float: 0 24px 60px -24px rgb(0 0 0 / 0.75);
+  }
+  /* focus rings follow the accent (brand) when one is chosen; otherwise they are the text colour, dark or light */
+  :root { --color-focus: var(--color-ink); }
+
   html {
     -webkit-text-size-adjust: 100%;
     color-scheme: light;
@@ -78,7 +123,7 @@
     @apply tracking-tight;
   }
   :focus-visible {
-    outline: 2px solid var(--color-ink);
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
   /* on near-black panels the focus ring switches to the accent */
@@ -87,7 +132,7 @@
   }
   ::selection {
     background: var(--color-accent);
-    color: var(--color-ink);
+    color: var(--color-on-accent);
   }
   input[type='date'],
   input[type='time'] {
@@ -112,35 +157,40 @@
 }
 
 /*
-  Dashboard composition. One column on small screens, then from 1280px: the key numbers and the
-  pipeline across the full width, the featured event (~55%) beside the insights (~45%), and the
-  "needs attention" table (six columns) and activity feed at full width.
+  Dashboard composition. One column on small screens. From 1024px the key numbers run across the full
+  width and the Events panel sits beside the pipeline (about 62 / 38 on laptops, 65 / 35 from 1280px);
+  below them the "needs attention" table (six columns) is full width, and insights sit beside the activity feed.
 */
 .dash-grid {
   display: grid;
   gap: 1rem;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'kpi' 'featured' 'pipeline' 'attention' 'insights' 'activity';
+  grid-template-areas: 'kpi' 'events' 'pipeline' 'attention' 'insights' 'activity';
+}
+@media (min-width: 1024px) {
+  .dash-grid {
+    gap: 1rem;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    grid-template-areas:
+      'kpi kpi'
+      'events pipeline'
+      'attention attention'
+      'insights activity';
+  }
 }
 @media (min-width: 1280px) {
   .dash-grid {
     gap: 1.25rem;
-    grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr);
-    grid-template-areas:
-      'kpi kpi'
-      'pipeline pipeline'
-      'featured insights'
-      'attention attention'
-      'activity activity';
+    grid-template-columns: minmax(0, 1.86fr) minmax(0, 1fr);
   }
 }
 /* people without management access get no attention / insights panels */
-.dash-grid--crew { grid-template-areas: 'kpi' 'featured' 'pipeline' 'activity'; }
-@media (min-width: 1280px) {
-  .dash-grid--crew { grid-template-areas: 'kpi kpi' 'pipeline pipeline' 'featured activity'; }
+.dash-grid--crew { grid-template-areas: 'kpi' 'events' 'pipeline' 'activity'; }
+@media (min-width: 1024px) {
+  .dash-grid--crew { grid-template-areas: 'kpi kpi' 'events pipeline' 'activity activity'; }
 }
 .dash-kpi { grid-area: kpi; min-width: 0; }
-.dash-featured { grid-area: featured; min-width: 0; }
+.dash-events { grid-area: events; min-width: 0; }
 .dash-pipeline { grid-area: pipeline; min-width: 0; }
 .dash-attention { grid-area: attention; min-width: 0; }
 .dash-insights { grid-area: insights; min-width: 0; }

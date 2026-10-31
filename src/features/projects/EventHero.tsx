@@ -12,7 +12,7 @@ import { formatMoney, type FinancialSummary } from '@/lib/money'
 import { fmtDateTime, fmtTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import type { ProductionTask, ProjectOverview } from '@/types/entities'
-import { summarizeTeam } from '@/features/dashboard/FeaturedEventCard'
+import { summarizeTeam } from './teamSummary'
 
 function Fact({ icon, label, children, className }: { icon: ReactNode; label: string; children: ReactNode; className?: string }) {
   return (

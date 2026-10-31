@@ -55,7 +55,7 @@ export function TabsTrigger({ className, ...props }: ComponentPropsWithoutRef<ty
   return (
     <RadixTabs.Trigger
       className={cn(
-        'inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink data-[state=active]:bg-ink data-[state=active]:text-white data-[state=active]:shadow-card',
+        'inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink data-[state=active]:bg-brand data-[state=active]:text-on-brand data-[state=active]:shadow-card',
         className,
       )}
       {...props}
@@ -75,7 +75,7 @@ export function Tooltip({ content, children, side = 'top' }: { content: ReactNod
     <RadixTooltip.Root delayDuration={250}>
       <RadixTooltip.Trigger asChild>{children}</RadixTooltip.Trigger>
       <RadixTooltip.Portal>
-        <RadixTooltip.Content side={side} sideOffset={6} className="z-[60] max-w-64 rounded-md bg-ink px-2.5 py-1.5 text-xs text-white shadow-pop">
+        <RadixTooltip.Content side={side} sideOffset={6} className="z-[60] max-w-64 rounded-md bg-inverse px-2.5 py-1.5 text-xs text-on-inverse shadow-pop">
           {content}
         </RadixTooltip.Content>
       </RadixTooltip.Portal>

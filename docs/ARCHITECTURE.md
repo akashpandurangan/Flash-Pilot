@@ -82,6 +82,11 @@ balance = agreed_amount − Σ(payments where status = 'valid')      -- view pro
 `allow_overpayment` is passed**; a confirmed overpayment simply yields a negative balance, shown as *credit*.
 Payments are voided (kept, marked, excluded) rather than deleted.
 
+**Delivery-payment attention** is a separate, narrower rule (`deliveryPaymentDue` in `src/lib/pending.ts`): an event needs a
+payment alert only when it is **Out for Delivery**, not cancelled, not archived, and its balance (the same helper as above) is above
+zero. It drives the badge on event cards and the Needs attention list; a partial payment at any other stage is not flagged. Only
+people with financial access ever load the figures.
+
 **Pending amount** (the dashboard card, the Payments page's *Outstanding* figure and its Outstanding/Overdue lists,
 Reports, and `dashboard_kpis().outstanding_amount`) is one rule, implemented once in `src/lib/pending.ts`: the sum of
 `max(balance, 0)` over **confirmed, non-archived** events. Cancelled events and inquiries are not owed anything yet,
@@ -89,7 +94,16 @@ and an overpaid event owes nothing without cancelling out another event's balanc
 records every time (never stored), is only loaded for people with financial access, and `tests/db` checks the SQL
 figure against the TypeScript rule.
 
-### Time zones
+### Appearance
+
+Each person picks Light / Dark / System and an accent colour in Settings (every role, from Settings or Account). Theme tokens are CSS
+variables in `src/index.css`; `data-theme="dark"` on `<html>` swaps them, and a non-default accent overrides a handful of them
+(`src/lib/appearance.ts` derives readable text, hover, soft and brand shades; lime is the stylesheet default and sets nothing, so the
+existing look is untouched). Status colours are never overridden. The choice is stored per person in `localStorage`
+(`fp.appearance.*`), applied before first paint by a tiny script in `index.html`, and mirrored to the person's own
+`profiles.appearance` (migration 10) on a best-effort basis.
+
+## Time zones
 
 Instants are stored in UTC. All entry and display uses the *studio's* zone (`date-fns-tz`), so "9:00 AM" means
 9:00 AM in `Asia/Kolkata` for every viewer. An end time at or before the start is read as after midnight.

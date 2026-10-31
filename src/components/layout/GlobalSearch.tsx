@@ -50,7 +50,7 @@ export function GlobalSearch() {
           <Search className="size-4" />
           <span className="min-[1440px]:hidden">Search…</span>
           <span className="hidden min-[1440px]:inline">Search events, clients…</span>
-          <kbd className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-ink">Ctrl K</kbd>
+          <kbd className="ml-auto rounded-full bg-subtle px-2 py-0.5 text-[11px] font-medium text-ink-muted">Ctrl K</kbd>
         </Button>
       </RadixDialog.Trigger>
       <RadixDialog.Trigger asChild>

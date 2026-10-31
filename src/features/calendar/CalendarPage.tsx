@@ -132,7 +132,7 @@ function Warnings({ conflicts }: { conflicts: ReturnType<typeof findAllConflicts
 }
 
 function chipStyle(e: ScheduleEvent) {
-  if (e.project.booking_status === 'confirmed') return 'bg-ink text-white hover:bg-brand-hover'
+  if (e.project.booking_status === 'confirmed') return 'bg-inverse text-on-inverse hover:opacity-85'
   if (e.project.booking_status === 'cancelled') return 'border border-line bg-subtle text-ink-muted line-through'
   return 'border border-dashed border-ink-muted bg-surface text-ink hover:bg-subtle'
 }
@@ -169,7 +169,7 @@ function MonthView({ grid, anchor, events, tz, today, warned, onDay }: { grid: s
             const inMonth = d.slice(0, 7) === anchor.slice(0, 7)
             return (
               <div key={d} className={cn('min-h-28 border-b border-r border-line p-1.5', (i + 1) % 7 === 0 && 'border-r-0', !inMonth && 'bg-sidebar/60')}>
-                <button type="button" onClick={() => onDay(d)} aria-label={`Open ${dayLabel(d, { weekday: 'long', day: 'numeric', month: 'long' })}`} className={cn('mb-1 flex size-6 items-center justify-center rounded-full text-xs tabular-nums hover:bg-subtle', d === today && 'bg-ink font-semibold text-white hover:bg-ink', !inMonth && d !== today && 'text-ink-muted')}>
+                <button type="button" onClick={() => onDay(d)} aria-label={`Open ${dayLabel(d, { weekday: 'long', day: 'numeric', month: 'long' })}`} className={cn('mb-1 flex size-6 items-center justify-center rounded-full text-xs tabular-nums hover:bg-subtle', d === today && 'bg-brand font-semibold text-on-brand hover:bg-brand', !inMonth && d !== today && 'text-ink-muted')}>
                   {Number(d.slice(8))}
                 </button>
                 <ul className="space-y-1">
@@ -228,7 +228,7 @@ function TimeGrid({ days, events, tz, today, warned, onDay }: { days: string[]; 
           <div />
           {days.map((d) => (
             <button key={d} type="button" disabled={!onDay} onClick={() => onDay?.(d)} className={cn('py-2 text-center text-xs font-medium', d === today ? 'text-ink' : 'text-ink-muted', onDay && 'hover:bg-subtle')}>
-              {dayLabel(d, { weekday: 'short' })} <span className={cn('ml-1 inline-flex size-6 items-center justify-center rounded-full tabular-nums', d === today && 'bg-ink text-white')}>{Number(d.slice(8))}</span>
+              {dayLabel(d, { weekday: 'short' })} <span className={cn('ml-1 inline-flex size-6 items-center justify-center rounded-full tabular-nums', d === today && 'bg-brand text-on-brand')}>{Number(d.slice(8))}</span>
             </button>
           ))}
         </div>

@@ -1,3 +1,4 @@
+import { effectiveStage, isLive, type LifecycleSubject } from './lifecycle'
 import { fromMinor, summarizeFinancials, toMinor } from './money'
 import type { ProjectFinancials, ProjectOverview } from '@/types/entities'
 
@@ -16,6 +17,10 @@ import type { ProjectFinancials, ProjectOverview } from '@/types/entities'
 
 type PendingProject = Pick<ProjectOverview, 'id' | 'booking_status' | 'archived_at'>
 type PendingFinancials = Pick<ProjectFinancials, 'project_id' | 'agreed_amount' | 'paid_amount'>
+
+/** What is still owed on one event, from its finance row: agreed amount − valid payments, never below zero (an overpayment owes nothing). */
+export const outstandingBalance = (f: Pick<ProjectFinancials, 'agreed_amount' | 'paid_amount'>): number =>
+  summarizeFinancials(f.agreed_amount, [{ amount: f.paid_amount }]).balance
 
 export const isPendingEligible = (p: Pick<ProjectOverview, 'booking_status' | 'archived_at'>) => p.booking_status === 'confirmed' && !p.archived_at
 
@@ -38,10 +43,24 @@ export function pendingAmount(projects: PendingProject[], financials: PendingFin
     seen.add(p.id)
     const f = finance.get(p.id)
     if (!f) continue
-    const minor = toMinor(summarizeFinancials(f.agreed_amount, [{ amount: f.paid_amount }]).balance) // already clamped at 0
+    const minor = toMinor(outstandingBalance(f)) // already clamped at 0
     if (minor <= 0) continue
     totalMinor += minor // integer paise: no floating-point drift however many events there are
     events.push({ projectId: p.id, balance: fromMinor(minor) })
   }
   return { total: fromMinor(totalMinor), count: events.length, events }
+}
+
+/**
+ * The delivery-payment alert rule, in one place (the event card badge and the Needs attention list both use it):
+ * an event needs attention when it is Out for Delivery, not cancelled, not archived and still owes money. Returns the
+ * amount owed, or null when the rule does not apply. Events at any other stage are never flagged by this rule just
+ * because they have a balance; that overall figure is the Pending amount card.
+ */
+export function deliveryPaymentDue(
+  p: LifecycleSubject, f: Pick<ProjectFinancials, 'agreed_amount' | 'paid_amount'> | null | undefined, now: Date = new Date(),
+): number | null {
+  if (!f || !isLive(p) || effectiveStage(p, now) !== 'out_for_delivery') return null
+  const balance = outstandingBalance(f)
+  return toMinor(balance) > 0 ? balance : null
 }

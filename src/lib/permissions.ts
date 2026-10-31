@@ -82,6 +82,8 @@ export interface NavItem {
   permission: Permission
   end?: boolean
   badge?: NavBadgeKey
+  /** Icon key when it differs from `key` (Account uses its own icon). */
+  icon?: string
 }
 
 export const NAV_SECTION_LABELS: Record<NavSection, string> = { main: 'Main', studio: 'Studio management', workspace: 'Workspace' }
@@ -99,14 +101,21 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'equipment', to: '/equipment', label: 'Equipment', section: 'studio', permission: 'equipment.view' },
   { key: 'payments', to: '/payments', label: 'Payments', section: 'studio', permission: 'finance.view' },
   { key: 'reports', to: '/reports', label: 'Reports', section: 'workspace', permission: 'reports.view' },
+  // Everyone has this entry, straight under Reports. Owners get the studio Settings; everyone else lands on
+  // their own Account page (see visibleNav) - the same routes and role checks as before.
+  { key: 'settings', to: '/settings', label: 'Settings', section: 'workspace', permission: 'overview.view' },
 ]
 
 export function visibleNav(actor: Actor | null | undefined): NavItem[] {
-  return NAV_ITEMS.filter((item) => can(actor, item.permission))
+  return NAV_ITEMS.filter((item) => can(actor, item.permission)).map((item) =>
+    item.key === 'settings' && !can(actor, 'studio.manage') ? { ...item, to: '/account', label: 'Account', icon: 'account' } : item,
+  )
 }
 
 /** Which sidebar entry is highlighted for the current URL. */
 export function isNavActive(item: NavItem, pathname: string, _search = ''): boolean {
   if (item.key === 'overview') return pathname === '/'
+  // owners reach their own Account page from Settings, so it keeps Settings highlighted
+  if (item.key === 'settings' && pathname === '/account') return true
   return pathname === item.to || pathname.startsWith(`${item.to}/`)
 }

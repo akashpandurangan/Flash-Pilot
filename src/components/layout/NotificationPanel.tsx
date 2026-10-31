@@ -71,7 +71,7 @@ export function NotificationPanel() {
                   if (n.link) navigate(n.link)
                 }}
               >
-                <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full', n.read_at ? 'bg-subtle text-ink-muted' : 'bg-accent text-ink')}>
+                <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full', n.read_at ? 'bg-subtle text-ink-muted' : 'bg-accent text-on-accent')}>
                   <Icon className="size-4" />
                 </span>
                 <span className="min-w-0">

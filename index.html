@@ -6,6 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Flash Pilot - run your photography studio in one place." />
     <title>Flash Pilot</title>
+    <!-- Apply the saved theme and accent before the app loads, so the page never flashes the wrong look. The values come
+         from what the app last applied (see src/features/appearance); the app takes over once it has loaded. -->
+    <script>
+      try {
+        var a = JSON.parse(localStorage.getItem('fp.appearance.applied') || 'null')
+        if (a && a.vars) {
+          var dark = a.mode === 'dark' || (a.mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          var root = document.documentElement
+          var vars = dark ? a.vars.dark : a.vars.light
+          root.setAttribute('data-theme', dark ? 'dark' : 'light')
+          for (var k in vars) root.style.setProperty(k, vars[k])
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

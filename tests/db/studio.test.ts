@@ -1131,3 +1131,42 @@ describe('the five Studio overview cards match the database', () => {
     expect(Number((await rpc()).outstanding_amount)).toBe(pending.total)
   })
 })
+
+describe('personal appearance (profiles.appearance)', () => {
+  it('starts empty for everyone, so existing people keep the current look', async () => {
+    const r = await q<{ appearance: Record<string, unknown> }>(ids.owner, `select appearance from public.profiles where id=$1`, [ids.owner])
+    expect(r[0]!.appearance).toEqual({})
+  })
+
+  it('lets a person save and read their own choice without touching the rest of their profile', async () => {
+    await q(ids.photo1, `update public.profiles set appearance = $2::jsonb where id = $1`, [ids.photo1, JSON.stringify({ mode: 'dark', accent: '#a78bfa' })])
+    const r = await q<{ appearance: { mode: string; accent: string }; full_name: string }>(ids.photo1, `select appearance, full_name from public.profiles where id=$1`, [ids.photo1])
+    expect(r[0]!.appearance).toEqual({ mode: 'dark', accent: '#a78bfa' })
+    expect(r[0]!.full_name).toBe('Pia Photographer')
+  })
+
+  it('keeps it private: nobody else can read it, and nobody else can change it (not even the studio owner)', async () => {
+    expect(await q(ids.photo2, `select appearance from public.profiles where id=$1`, [ids.photo1])).toHaveLength(0)
+    const other = await t.as(ids.photo2, () => t.db.query(`update public.profiles set appearance = '{"mode":"light"}'::jsonb where id=$1`, [ids.photo1]))
+    expect(other.affectedRows).toBe(0)
+    const owner = await t.as(ids.owner, () => t.db.query(`update public.profiles set appearance = '{"mode":"light"}'::jsonb where id=$1`, [ids.photo1]))
+    expect(owner.affectedRows).toBe(0)
+    expect((await t.one<{ appearance: { mode: string } }>(`select appearance from public.profiles where id=$1`, [ids.photo1])).appearance.mode).toBe('dark')
+  })
+
+  it('is not stored on any studio record', async () => {
+    const cols = await t.rows<{ table_name: string }>(`select table_name from information_schema.columns where table_schema='public' and column_name='appearance'`)
+    expect(cols.map((c) => c.table_name)).toEqual(['profiles'])
+  })
+
+  it('refuses anything that is not a small JSON object', async () => {
+    for (const bad of [JSON.stringify(['dark']), JSON.stringify('dark'), JSON.stringify(42), JSON.stringify({ blob: 'x'.repeat(600) })]) {
+      expect(await t.as(ids.photo1, () => t.fails(`update public.profiles set appearance = $2::jsonb where id = $1`, [ids.photo1, bad])), bad.slice(0, 20)).toMatch(/profiles_appearance_shape|check constraint/)
+    }
+  })
+
+  it('leaves new sign-ups with the default', async () => {
+    const id = await t.newUser('newcomer@studio.test', 'New Comer')
+    expect((await t.one<{ appearance: Record<string, unknown> }>(`select appearance from public.profiles where id=$1`, [id])).appearance).toEqual({})
+  })
+})

@@ -108,17 +108,17 @@ describe('action required', () => {
     archived_at: null, editing_due_date: null, delivery_due_date: null, editing_completed_at: null, ...over,
   })
 
-  it('collects unstaffed, unpaid, overdue and conflict items, most urgent first', () => {
+  it('collects unstaffed, payment, overdue and conflict items, most urgent first', () => {
     const items = buildActionItems({
       events: [ev('a', 9, 13, { assignments: [] }), ev('b', 9, 13, { venueName: '' })],
-      projects: [project('p-a'), project('p-b', { editing_due_date: '2029-12-01' }), project('p-c', { delivery_due_date: '2029-12-01', production_stage: 'out_for_delivery' })],
-      financials: [{ project_id: 'p-a', balance: 5000, payment_due_date: '2029-12-10' }, { project_id: 'p-b', balance: 0, payment_due_date: null }],
+      projects: [project('p-a', { production_stage: 'out_for_delivery' }), project('p-b', { editing_due_date: '2029-12-01' }), project('p-c', { delivery_due_date: '2029-12-01', production_stage: 'out_for_delivery' })],
+      financials: [{ project_id: 'p-a', agreed_amount: 20000, paid_amount: 15000 }, { project_id: 'p-b', agreed_amount: 8000, paid_amount: 8000 }],
       inventory: [camera], tz: 'Asia/Kolkata', currency: 'INR', now,
     })
     const kinds = items.map((i) => i.kind)
-    expect(kinds).toEqual(expect.arrayContaining(['unstaffed', 'unpaid', 'overdue_editing', 'overdue_delivery', 'missing_details']))
-    expect(items.find((i) => i.kind === 'unpaid')?.severity).toBe('high') // past its due date
-    expect(items.find((i) => i.kind === 'unpaid')?.title).toContain('₹5,000')
+    expect(kinds).toEqual(expect.arrayContaining(['unstaffed', 'delivery_payment', 'overdue_editing', 'overdue_delivery', 'missing_details']))
+    expect(items.find((i) => i.kind === 'delivery_payment')?.severity).toBe('high')
+    expect(items.find((i) => i.kind === 'delivery_payment')?.title).toContain('₹5,000')
     expect(items.find((i) => i.kind === 'overdue_editing')?.href).toBe('/events/p-b')
     const order = items.map((i) => i.severity)
     expect(order).toEqual([...order].sort((x, y) => ({ high: 0, medium: 1, low: 2 }[x] - { high: 0, medium: 1, low: 2 }[y])))
@@ -126,10 +126,10 @@ describe('action required', () => {
 
   it('omits money items when the viewer has no financial access', () => {
     const items = buildActionItems({ events: [], projects: [project('p-a')], financials: null, inventory: [], tz: 'Asia/Kolkata', currency: 'INR', now })
-    expect(items.some((i) => i.kind === 'unpaid')).toBe(false)
+    expect(items.some((i) => i.kind === 'delivery_payment')).toBe(false)
   })
 
   it('returns nothing for a healthy studio', () => {
-    expect(buildActionItems({ events: [ev('a', 9, 13)], projects: [project('p-a')], financials: [{ project_id: 'p-a', balance: 0, payment_due_date: null }], inventory: [], tz: 'Asia/Kolkata', currency: 'INR', now })).toEqual([])
+    expect(buildActionItems({ events: [ev('a', 9, 13)], projects: [project('p-a')], financials: [{ project_id: 'p-a', agreed_amount: 0, paid_amount: 0 }], inventory: [], tz: 'Asia/Kolkata', currency: 'INR', now })).toEqual([])
   })
 })

@@ -73,8 +73,8 @@ export function Checkbox({ label, description, className, ...props }: InputHTMLA
   return (
     <div className={cn('flex items-start gap-2.5', className)}>
       <span className="relative mt-0.5 flex size-4 shrink-0 items-center justify-center">
-        <input id={id} type="checkbox" className="peer size-4 cursor-pointer appearance-none rounded-[4px] border border-line-strong bg-surface checked:border-ink checked:bg-ink disabled:cursor-not-allowed disabled:opacity-50" {...props} />
-        <Check className="pointer-events-none absolute size-3 text-white opacity-0 peer-checked:opacity-100" strokeWidth={3} aria-hidden />
+        <input id={id} type="checkbox" className="peer size-4 cursor-pointer appearance-none rounded-[4px] border border-line-strong bg-surface checked:border-brand checked:bg-brand disabled:cursor-not-allowed disabled:opacity-50" {...props} />
+        <Check className="pointer-events-none absolute size-3 text-on-brand opacity-0 peer-checked:opacity-100" strokeWidth={3} aria-hidden />
       </span>
       <label htmlFor={id} className="cursor-pointer text-sm leading-5">
         {label}
@@ -105,7 +105,7 @@ export function Switch({ checked, onCheckedChange, label, description, disabled,
         checked={checked}
         disabled={disabled}
         onCheckedChange={onCheckedChange}
-        className="relative h-5 w-9 shrink-0 cursor-pointer rounded-full bg-line-strong transition-colors data-[state=checked]:bg-ink disabled:cursor-not-allowed disabled:opacity-50"
+        className="relative h-5 w-9 shrink-0 cursor-pointer rounded-full bg-line-strong transition-colors data-[state=checked]:bg-brand disabled:cursor-not-allowed disabled:opacity-50"
       >
         <RadixSwitch.Thumb className="block size-4 translate-x-0.5 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-[18px]" />
       </RadixSwitch.Root>

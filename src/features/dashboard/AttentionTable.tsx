@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Card, EmptyState, TableWrap, TD, TH, THead } from '@/components/ui/display'
 import { SEVERITY_LABELS, type ActionItem, type Severity } from '@/lib/alerts'
+import { formatMoney } from '@/lib/money'
 import { fmtDateShort } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
@@ -14,7 +15,7 @@ function RiskBadge({ severity }: { severity: Severity }) {
     <span
       className={cn(
         'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold',
-        severity === 'high' && 'bg-danger text-white',
+        severity === 'high' && 'bg-danger-solid text-white',
         severity === 'medium' && 'bg-warning-soft text-warning',
         severity === 'low' && 'bg-subtle text-ink-muted',
       )}
@@ -28,8 +29,11 @@ function RiskBadge({ severity }: { severity: Severity }) {
  * Events that need someone to do something. One row per problem; the whole row opens the event, and
  * the button names the fix ("Assign team", "Record payment"…). On phones each row becomes a card.
  */
-export function AttentionTable({ items, tz, eventCount, updatedLabel }: { items: ActionItem[]; tz: string; eventCount: number; updatedLabel?: string }) {
+export function AttentionTable({ items, tz, currency, eventCount, updatedLabel }: { items: ActionItem[]; tz: string; currency: string; eventCount: number; updatedLabel?: string }) {
   const navigate = useNavigate()
+  // events out for delivery that still owe money: how many, and how much
+  const payments = items.filter((i) => i.kind === 'delivery_payment')
+  const owed = payments.reduce((sum, i) => sum + (i.amount ?? 0), 0)
   const [expanded, setExpanded] = useState(false)
   const shown = expanded ? items : items.slice(0, ROWS_COLLAPSED)
 
@@ -39,12 +43,14 @@ export function AttentionTable({ items, tz, eventCount, updatedLabel }: { items:
         <div className="mb-3">
           <h2 id="needs-attention-title" className="text-lg font-semibold tracking-tight">Needs attention</h2>
           <p className="mt-0.5 text-xs text-ink-muted">
-            {items.length === 0 ? 'Nothing is flagged right now' : `${eventCount} ${eventCount === 1 ? 'event' : 'events'} flagged`}{updatedLabel ? ` · ${updatedLabel}` : ''}
+            {items.length === 0 ? 'Nothing is flagged right now' : `${eventCount} ${eventCount === 1 ? 'event' : 'events'} flagged`}
+            {payments.length > 0 && ` · ${formatMoney(owed, currency)} payment pending on ${payments.length} ${payments.length === 1 ? 'delivery' : 'deliveries'}`}
+            {updatedLabel ? ` · ${updatedLabel}` : ''}
           </p>
         </div>
 
         {items.length === 0 ? (
-          <EmptyState icon={<CircleCheck />} title="You're all caught up" description="Unstaffed sessions, overdue work and pending balances will appear here." className="border-0 bg-subtle/60 py-8" />
+          <EmptyState icon={<CircleCheck />} title="You're all caught up" description="Unstaffed sessions, overdue work and unpaid deliveries will appear here." className="border-0 bg-subtle/60 py-8" />
         ) : (
           <>
             <div className="hidden md:block">

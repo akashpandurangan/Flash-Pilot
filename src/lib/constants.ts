@@ -20,10 +20,6 @@ export const PRODUCTION_STAGE_LABELS: Labels<ProductionStage> = {
   upcoming: 'Upcoming', production: 'Production', awaiting_approval: 'Waiting for Client Approval', editing: 'Editing',
   out_for_delivery: 'Out for Delivery', delivered: 'Delivered',
 }
-/** For tight spots (the dashboard pipeline); the full name stays in the tooltip and the accessible label. */
-export const PRODUCTION_STAGE_SHORT_LABELS: Labels<ProductionStage> = {
-  ...PRODUCTION_STAGE_LABELS, awaiting_approval: 'Client approval',
-}
 
 export const ASSIGNMENT_ROLE_LABELS: Labels<AssignmentRole> = {
   lead_photographer: 'Lead photographer', second_photographer: 'Second photographer', videographer: 'Videographer',

@@ -43,7 +43,7 @@ export function AppShell() {
   return (
     <HeaderSlotProvider>
       <div className="min-h-dvh bg-page">
-        <a href="#main" className="sr-only z-[100] rounded-full bg-ink px-4 py-2 text-white focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>
+        <a href="#main" className="sr-only z-[100] rounded-full bg-inverse px-4 py-2 text-on-inverse focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>
 
         {/* Desktop / large tablet sidebar */}
         <aside
@@ -58,7 +58,7 @@ export function AppShell() {
         {/* Drawer for phones and tablets */}
         <RadixDialog.Root open={drawer} onOpenChange={setDrawer}>
           <RadixDialog.Portal>
-            <RadixDialog.Overlay className="fixed inset-0 z-40 bg-dark/40 lg:hidden" />
+            <RadixDialog.Overlay className="fixed inset-0 z-40 bg-black/40 lg:hidden" />
             <RadixDialog.Content className="fixed inset-y-3 left-3 z-50 w-[272px] max-w-[88vw] rounded-panel bg-surface p-4 shadow-pop [animation:fp-slide-in-left_.2s_ease-out] lg:hidden">
               <RadixDialog.Title className="sr-only">Navigation</RadixDialog.Title>
               <RadixDialog.Description className="sr-only">Main navigation menu</RadixDialog.Description>

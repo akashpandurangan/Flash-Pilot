@@ -67,7 +67,7 @@ export default function OnboardingPage() {
             const done = n < current
             return (
               <li key={label} className="flex flex-1 items-center gap-2" aria-current={n === current ? 'step' : undefined}>
-                <span className={cn('flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold', done ? 'border-ink bg-ink text-white' : n === current ? 'border-ink bg-surface' : 'border-line-strong text-ink-muted')}>
+                <span className={cn('flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold', done ? 'border-brand bg-brand text-on-brand' : n === current ? 'border-ink bg-surface' : 'border-line-strong text-ink-muted')}>
                   {done ? <Check className="size-3.5" strokeWidth={3} aria-hidden /> : n}
                 </span>
                 <span className={cn('hidden text-sm sm:inline', n === current ? 'font-medium' : 'text-ink-muted')}>{label}</span>
@@ -368,7 +368,7 @@ function DoneStep({ name, onFinish }: { name: string; onFinish: () => Promise<vo
   const [error, setError] = useState<string | null>(null)
   return (
     <div className="flex flex-col items-center py-6 text-center">
-      <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-ink text-white"><PartyPopper className="size-6" aria-hidden /></div>
+      <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-brand text-on-brand"><PartyPopper className="size-6" aria-hidden /></div>
       <h1 className="text-xl font-semibold tracking-tight">{name} is ready</h1>
       <p className="mt-2 max-w-sm text-sm leading-relaxed text-ink-muted">
         Your workspace is set up. Add your first client and create an event - bookings, payments and production tracking all start there.

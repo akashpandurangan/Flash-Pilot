@@ -11,8 +11,8 @@ const badge = cva('inline-flex items-center gap-1.5 whitespace-nowrap rounded-fu
   variants: {
     tone: {
       neutral: 'bg-subtle text-ink',
-      solid: 'bg-ink text-white',
-      accent: 'bg-accent text-ink',
+      solid: 'bg-inverse text-on-inverse',
+      accent: 'bg-accent text-on-accent',
       outline: 'border border-line-strong bg-surface text-ink-muted',
       success: 'bg-success-soft text-success',
       warning: 'bg-warning-soft text-warning',
@@ -47,7 +47,7 @@ export function AvatarStack({ names, max = 3, className }: { names: string[]; ma
       <span className="flex -space-x-1.5" aria-hidden>
         {shown.map((n, i) => <Avatar key={`${n}-${i}`} name={n} className="size-7 text-[10px] ring-2 ring-surface" />)}
         {names.length > max && (
-          <span className="inline-flex size-7 items-center justify-center rounded-full bg-ink text-[10px] font-semibold text-white ring-2 ring-surface">+{names.length - max}</span>
+          <span className="inline-flex size-7 items-center justify-center rounded-full bg-inverse text-[10px] font-semibold text-on-inverse ring-2 ring-surface">+{names.length - max}</span>
         )}
       </span>
     </span>
@@ -289,7 +289,7 @@ export function Segmented<T extends string>({ value, onChange, options, label }:
           aria-pressed={value === o.value}
           aria-label={o.ariaLabel}
           onClick={() => onChange(o.value)}
-          className={cn('inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-colors', value === o.value ? 'bg-ink text-white shadow-card' : 'text-ink-muted hover:text-ink')}
+          className={cn('inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-colors', value === o.value ? 'bg-brand text-on-brand shadow-card' : 'text-ink-muted hover:text-ink')}
         >
           {o.label}
         </button>

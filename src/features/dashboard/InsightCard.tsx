@@ -22,7 +22,7 @@ export function InsightCard({ headline, insights, updatedLabel, onReview }: {
       <div className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-accent/10 blur-2xl" aria-hidden />
       <div className="relative flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-full bg-accent text-ink"><Sparkles className="size-4" aria-hidden /></span>
+          <span className="flex size-8 items-center justify-center rounded-full bg-accent text-on-accent"><Sparkles className="size-4" aria-hidden /></span>
           <h2 id="insights-title" className="text-[15px] font-semibold">Studio insights</h2>
         </div>
         <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-white/75">{updatedLabel ?? 'Live data'}</span>

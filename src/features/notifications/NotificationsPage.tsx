@@ -47,7 +47,7 @@ export default function NotificationsPage() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div className="inline-flex rounded-md border border-line-strong p-0.5" role="group" aria-label="Filter notifications">
               {(['all', 'unread'] as const).map((k) => (
-                <button key={k} type="button" aria-pressed={f.filter === k} onClick={() => setF({ filter: k })} className={cn('h-8 rounded px-3 text-[13px] font-medium capitalize', f.filter === k ? 'bg-ink text-white' : 'text-ink-muted hover:text-ink')}>{k}</button>
+                <button key={k} type="button" aria-pressed={f.filter === k} onClick={() => setF({ filter: k })} className={cn('h-8 rounded px-3 text-[13px] font-medium capitalize', f.filter === k ? 'bg-brand text-on-brand' : 'text-ink-muted hover:text-ink')}>{k}</button>
               ))}
             </div>
             <Button variant="secondary" size="sm" onClick={() => readAll.mutate()} loading={readAll.isPending} disabled={unread === 0}><CheckCheck className="size-4" /> Mark all read</Button>

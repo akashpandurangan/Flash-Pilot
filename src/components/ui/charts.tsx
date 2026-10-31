@@ -61,7 +61,7 @@ export function ColumnChart({ data, label, unit, format = (n) => String(n), high
                     <div className="relative flex w-full flex-1 items-end justify-center">
                       {showValue && <span className="absolute left-1/2 -translate-x-1/2 text-[11px] font-semibold tabular-nums text-ink" style={{ bottom: `calc(${pct}% + 4px)` }}>{format(d.value)}</span>}
                       <div
-                        className={cn('w-full max-w-6 rounded-t-[4px] transition-colors', d.value === 0 ? 'h-px bg-line-strong' : cn('group-hover:bg-dark', dim ? 'bg-ink-faint' : 'bg-dark'))}
+                        className={cn('w-full max-w-6 rounded-t-[4px] transition-colors', d.value === 0 ? 'h-px bg-line-strong' : cn('group-hover:bg-brand', dim ? 'bg-ink-faint' : 'bg-ink'))}
                         style={d.value === 0 ? undefined : { height: `${Math.max(pct, 2)}%` }}
                       />
                       <span className="pointer-events-none absolute left-1/2 z-10 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-dark px-2.5 py-1.5 text-xs font-medium text-white shadow-pop group-hover:block" style={{ bottom: `calc(${pct}% + 22px)` }}>
@@ -83,7 +83,7 @@ export function ColumnChart({ data, label, unit, format = (n) => String(n), high
 
 export type BarTone = 'dark' | 'ok' | 'caution' | 'risk' | 'muted'
 
-const FILL: Record<BarTone, string> = { dark: 'bg-dark', ok: 'bg-ok', caution: 'bg-caution', risk: 'bg-risk', muted: 'bg-ink-faint' }
+const FILL: Record<BarTone, string> = { dark: 'bg-ink', ok: 'bg-ok', caution: 'bg-caution', risk: 'bg-risk', muted: 'bg-ink-faint' }
 
 export interface BarListItem {
   key: string

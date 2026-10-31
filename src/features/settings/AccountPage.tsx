@@ -15,6 +15,7 @@ import { errorMessage } from '@/lib/errors'
 import { isValidPhone } from '@/lib/utils'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useStudio } from '@/features/studio/StudioProvider'
+import { AppearanceSettings } from './AppearanceSettings'
 
 const profileSchema = z.object({
   full_name: z.string().trim().min(2, 'Enter your full name'),
@@ -37,7 +38,7 @@ export default function AccountPage() {
   return (
     <>
       <PageHeader title="Account" description="Your personal details and sign-in." />
-      <div className="grid max-w-2xl gap-4">
+      <div className="grid max-w-3xl gap-4">
         <form
           noValidate
           className="contents"
@@ -89,6 +90,8 @@ export default function AccountPage() {
             </div>
           </Panel>
         </form>
+
+        <AppearanceSettings />
 
         <Panel title="Notifications">
           <p className="text-sm text-ink-muted">Choose which reminders and updates you receive, and where.</p>
