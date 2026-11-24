@@ -1,0 +1,175 @@
+/*
+ * The "Interactive demo" bar. Plain CSS (not Tailwind utilities) on purpose: the demo folder is hidden from Tailwind's file scan
+ * so the production build never sees it (see entry.css), and plain CSS needs no scanning. It uses the app's own colour and
+ * shadow tokens, so it follows the light/dark theme and the user's accent colour like everything else.
+ */
+.demo-bar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 12px;
+  z-index: 45; /* above the page and the sticky header, below dialogs and their overlays (z-50) */
+  display: flex;
+  justify-content: center;
+  padding-inline: 12px;
+  pointer-events: none; /* the empty strip around the pill never blocks the page */
+}
+
+.demo-bar__panel,
+.demo-bar__chip {
+  pointer-events: auto;
+  background: var(--color-inverse);
+  color: var(--color-on-inverse);
+  box-shadow: var(--shadow-pop);
+}
+
+.demo-bar__panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 4px;
+  max-width: 100%;
+  padding: 6px 6px 6px 14px;
+  border-radius: 22px;
+}
+
+.demo-bar__chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9999px;
+  font: inherit;
+  cursor: pointer;
+}
+
+@media (min-width: 640px) {
+  .demo-bar__panel {
+    border-radius: 9999px;
+  }
+}
+
+.demo-bar__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.demo-bar__dot {
+  position: relative;
+  display: flex;
+  width: 8px;
+  height: 8px;
+}
+
+.demo-bar__ping,
+.demo-bar__core {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: var(--color-accent);
+}
+
+.demo-bar__ping {
+  opacity: 0.6;
+  animation: demo-bar-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes demo-bar-ping {
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-bar__ping {
+    display: none;
+  }
+}
+
+.demo-bar__divider {
+  display: none;
+  width: 1px;
+  height: 20px;
+  margin-inline: 4px;
+  background: color-mix(in oklab, var(--color-on-inverse) 20%, transparent);
+}
+
+@media (min-width: 640px) {
+  .demo-bar__divider {
+    display: block;
+  }
+}
+
+.demo-bar__action,
+.demo-bar__icon,
+.demo-bar__exit {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  border: 0;
+  border-radius: 9999px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease-out;
+}
+
+.demo-bar__action {
+  gap: 6px;
+  padding: 0 12px;
+  background: transparent;
+  color: color-mix(in oklab, var(--color-on-inverse) 90%, transparent);
+  font-weight: 500;
+}
+
+.demo-bar__icon {
+  justify-content: center;
+  width: 32px;
+  background: transparent;
+  color: color-mix(in oklab, var(--color-on-inverse) 70%, transparent);
+}
+
+.demo-bar__action:hover:not(:disabled),
+.demo-bar__icon:hover {
+  background: color-mix(in oklab, var(--color-on-inverse) 10%, transparent);
+}
+
+.demo-bar__action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.demo-bar__exit {
+  gap: 6px;
+  padding: 0 12px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 600;
+}
+
+.demo-bar__exit:hover {
+  background: var(--color-accent-hover);
+}
+
+.demo-bar__chip:focus-visible,
+.demo-bar__action:focus-visible,
+.demo-bar__icon:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.demo-bar__exit:focus-visible {
+  outline: 2px solid var(--color-on-inverse);
+  outline-offset: 1px;
+}

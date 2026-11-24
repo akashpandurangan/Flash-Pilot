@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Flash Pilot interactive demo - a sandbox with fictional data. Nothing you do here is saved." />
+    <!-- A sandbox with made-up data: keep it out of search results. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Flash Pilot — Interactive Demo</title>
+    <!-- Same pre-paint theme/accent script as the app, so the page never flashes the wrong look. -->
+    <script>
+      try {
+        var a = JSON.parse(localStorage.getItem('fp.appearance.applied') || 'null')
+        if (a && a.vars) {
+          var dark = a.mode === 'dark' || (a.mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          var root = document.documentElement
+          var vars = dark ? a.vars.dark : a.vars.light
+          root.setAttribute('data-theme', dark ? 'dark' : 'light')
+          for (var k in vars) root.style.setProperty(k, vars[k])
+        }
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/demo/src/main.tsx"></script>
+  </body>
+</html>

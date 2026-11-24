@@ -1,0 +1,24 @@
+/*
+ * Stylesheet entry of the demo build: the app's own styles, plus what only the demo needs.
+ *
+ * `demo/.ignore` hides this folder from Tailwind's automatic file scan. The PRODUCTION build scans the whole repository, so
+ * without it the demo's files would add utility classes to the production stylesheet and change the production build.
+ * Everything in demo/ is therefore styled with plain CSS (see demo-bar.css) rather than Tailwind utilities.
+ */
+@import '../../src/index.css';
+@import './demo-bar.css';
+
+/*
+ * Small-screen guards. At about 360px wide two of the app's own layouts are a few pixels wider than the screen and the page
+ * scrolls sideways: a <fieldset> refuses to shrink below its content (browsers give it min-width: min-content), and chart
+ * cards inside a grid keep their chart's width. Letting those shrink fixes it. Demo build only; the app is untouched.
+ */
+@media (max-width: 400px) {
+  fieldset {
+    min-width: 0;
+  }
+
+  main .grid > * {
+    min-width: 0;
+  }
+}

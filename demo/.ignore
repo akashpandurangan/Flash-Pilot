@@ -1,0 +1,5 @@
+# Keeps this folder out of Tailwind's automatic source scan (it honours .ignore files like .gitignore).
+# The app's production build scans the whole repository; without this file the demo's code would add a few utility classes to the
+# production stylesheet and change the production build. Nothing in demo/ relies on being scanned (it uses plain CSS).
+# Side effect: tools built on ripgrep (e.g. editor search) skip demo/ unless "use ignore files" is switched off.
+*
